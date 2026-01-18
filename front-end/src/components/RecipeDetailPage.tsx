@@ -1,0 +1,606 @@
+import { useState, useRef } from 'react';
+import { ArrowLeft, Star, Clock, Users, Heart, Share2, ShoppingCart, CheckCircle2, Play, ChefHat, Bike, MessageCircle, ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Checkbox } from './ui/checkbox';
+import { Separator } from './ui/separator';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import { Avatar } from './ui/avatar';
+import { Card } from './ui/card';
+
+interface RecipeDetailPageProps {
+  onNavigate: (page: string) => void;
+}
+
+export function RecipeDetailPage({ onNavigate }: RecipeDetailPageProps) {
+  const [selectedIngredients, setSelectedIngredients] = useState<string[]>([
+    'fish-sauce', 'vermicelli', 'pork', 'herbs', 'lettuce', 'cucumber'
+  ]);
+  const [isLiked, setIsLiked] = useState(false);
+  const [showRestaurantModal, setShowRestaurantModal] = useState(false);
+  
+  // Refs for smooth scrolling
+  const ingredientsRef = useRef<HTMLDivElement>(null);
+  const reviewsRef = useRef<HTMLDivElement>(null);
+
+  const ingredients = [
+    { id: 'fish-sauce', name: 'Fish Sauce', amount: '100ml', price: 2.50, inPantry: false },
+    { id: 'vermicelli', name: 'Vermicelli Noodles', amount: '500g', price: 3.00, inPantry: false },
+    { id: 'pork', name: 'Grilled Pork Belly', amount: '400g', price: 5.00, inPantry: false },
+    { id: 'herbs', name: 'Fresh Herbs Mix', amount: '1 bunch', price: 1.50, inPantry: false },
+    { id: 'lettuce', name: 'Lettuce', amount: '1 head', price: 1.00, inPantry: true },
+    { id: 'cucumber', name: 'Cucumber', amount: '2 pieces', price: 1.50, inPantry: false },
+    { id: 'garlic', name: 'Garlic', amount: '5 cloves', price: 0.50, inPantry: true },
+  ];
+
+  const steps = [
+    'Marinate pork belly with fish sauce, garlic, and sugar for 2 hours',
+    'Grill pork belly over charcoal until caramelized and slightly charred',
+    'Cook vermicelli noodles according to package instructions and drain',
+    'Prepare the dipping sauce by mixing fish sauce, sugar, lime juice, and chili',
+    'Arrange fresh herbs, lettuce, and cucumber on a serving plate',
+    'Serve grilled pork with vermicelli, herbs, and dipping sauce'
+  ];
+
+  // Mock data for nearby restaurants that serve this dish
+  // TODO: Connect to Backend API - GET /api/restaurants/nearby?dish=bun-cha&lat=XX&lng=XX
+  const nearbyRestaurants = [
+    {
+      id: 'r1',
+      name: 'Pho Thin Restaurant',
+      logo: '🍜',
+      distance: '0.8 km',
+      rating: 4.7,
+      reviews: 234,
+      price: 8.50,
+      deliveryTime: '20-30 min',
+      deliveryFee: 0,
+      image: 'https://images.unsplash.com/photo-1708493449638-be3ffd051472?w=400'
+    },
+    {
+      id: 'r2',
+      name: 'Mama Kitchen',
+      logo: '👩‍🍳',
+      distance: '1.2 km',
+      rating: 4.9,
+      reviews: 456,
+      price: 12.00,
+      deliveryTime: '25-35 min',
+      deliveryFee: 2.50,
+      image: 'https://images.unsplash.com/photo-1693743387915-7d190a0e636f?w=400'
+    },
+    {
+      id: 'r3',
+      name: 'Saigon Street Food',
+      logo: '🥢',
+      distance: '2.1 km',
+      rating: 4.6,
+      reviews: 189,
+      price: 7.00,
+      deliveryTime: '30-40 min',
+      deliveryFee: 0,
+      image: 'https://images.unsplash.com/photo-1739792598744-3512897156e3?w=400'
+    },
+  ];
+
+  // Mock data for reviews
+  const reviews = [
+    {
+      id: 1,
+      author: 'Sarah M.',
+      avatar: 'SM',
+      rating: 5,
+      date: '2 days ago',
+      comment: 'This is the BEST Bún Chả recipe I\'ve ever tried! The balance of flavors is perfect. My family loved it!',
+      helpful: 42,
+      verified: true
+    },
+    {
+      id: 2,
+      author: 'David Chen',
+      avatar: 'DC',
+      rating: 4,
+      date: '1 week ago',
+      comment: 'Great recipe! I substituted chicken for pork and it still turned out amazing. The dipping sauce is incredible.',
+      helpful: 28,
+      verified: false
+    },
+    {
+      id: 3,
+      author: 'Emily R.',
+      avatar: 'ER',
+      rating: 5,
+      date: '2 weeks ago',
+      comment: 'Authentic taste! I lived in Hanoi for 2 years and this tastes just like what I had there. Highly recommend!',
+      helpful: 56,
+      verified: true
+    },
+    {
+      id: 4,
+      author: 'Mike Johnson',
+      avatar: 'MJ',
+      rating: 4,
+      date: '3 weeks ago',
+      comment: 'Easy to follow instructions. Took me about an hour total. The charred pork is key!',
+      helpful: 19,
+      verified: false
+    },
+    {
+      id: 5,
+      author: 'Lisa Wong',
+      avatar: 'LW',
+      rating: 5,
+      date: '1 month ago',
+      comment: 'Made this for a dinner party and everyone asked for the recipe! Will definitely make again.',
+      helpful: 34,
+      verified: true
+    },
+  ];
+
+  const toggleIngredient = (id: string) => {
+    setSelectedIngredients(prev =>
+      prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
+    );
+  };
+
+  const totalPrice = ingredients
+    .filter(i => selectedIngredients.includes(i.id) && !i.inPantry)
+    .reduce((sum, i) => sum + i.price, 0);
+
+  // Smooth scroll to ingredients section
+  const scrollToIngredients = () => {
+    ingredientsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // Smooth scroll to reviews section
+  const scrollToReviews = () => {
+    reviewsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+
+  // Open restaurant modal
+  // TODO: Connect to Backend - This should trigger an API call to fetch real restaurant data
+  const handleOrderReadyMeal = () => {
+    setShowRestaurantModal(true);
+  };
+
+  const averageRating = 4.8;
+  const totalReviews = 120;
+
+  return (
+    <div className="min-h-screen bg-[#F9F9F9] pb-32 md:pb-8 scroll-smooth">
+      {/* Mobile Header */}
+      <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-xl border-b border-gray-200 md:hidden">
+        <div className="flex items-center gap-3 px-4 py-3">
+          <button onClick={() => onNavigate('home')} className="p-2 hover:bg-gray-100 rounded-full">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <span className="font-semibold text-lg">Recipe Details</span>
+        </div>
+      </div>
+
+      {/* Desktop Back Button */}
+      <div className="hidden md:block max-w-7xl mx-auto px-4 py-4">
+        <button onClick={() => onNavigate('home')} className="flex items-center gap-2 text-gray-600 hover:text-gray-900">
+          <ArrowLeft className="w-5 h-5" />
+          Back to Home
+        </button>
+      </div>
+
+      <div className="max-w-7xl mx-auto px-0 md:px-4">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-0 lg:gap-6">
+          {/* Left Column - Recipe Content */}
+          <div className="lg:col-span-2">
+            {/* Hero Image */}
+            <div className="relative aspect-video w-full overflow-hidden md:rounded-3xl mb-4 md:mb-6">
+              <img
+                src="https://images.unsplash.com/photo-1763703544688-2ac7839b0659?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHx2aWV0bmFtZXNlJTIwYnVuJTIwY2hhfGVufDF8fHx8MTc2ODU3NzU3OHww&ixlib=rb-4.1.0&q=80&w=1080"
+                alt="Bún Chả Hà Nội"
+                className="w-full h-full object-cover"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent"></div>
+              <button className="absolute inset-0 flex items-center justify-center">
+                <div className="w-16 h-16 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center hover:bg-white transition-colors">
+                  <Play className="w-8 h-8 text-[#FF6B35] ml-1" />
+                </div>
+              </button>
+              <div className="absolute top-4 right-4 flex gap-2">
+                <button
+                  onClick={() => setIsLiked(!isLiked)}
+                  className="p-3 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors"
+                >
+                  <Heart className={`w-6 h-6 ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-700'}`} />
+                </button>
+                <button className="p-3 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors">
+                  <Share2 className="w-6 h-6 text-gray-700" />
+                </button>
+              </div>
+            </div>
+
+            <div className="bg-white md:rounded-3xl p-4 md:p-6 mb-4 md:mb-6">
+              {/* Title & Info */}
+              <div className="mb-6">
+                <h1 className="text-3xl md:text-4xl font-bold mb-3">Bún Chả Hà Nội</h1>
+                <p className="text-gray-600 mb-4">
+                  A beloved Vietnamese dish featuring grilled pork patties served with vermicelli noodles, 
+                  fresh herbs, and a sweet-savory dipping sauce.
+                </p>
+                <div className="flex flex-wrap gap-4 text-sm">
+                  {/* Clickable Rating with smooth scroll to reviews */}
+                  <button
+                    onClick={scrollToReviews}
+                    data-testid="review-anchor"
+                    className="flex items-center gap-2 hover:bg-gray-100 px-3 py-1 rounded-full transition-all hover:scale-105"
+                  >
+                    <Star className="w-5 h-5 fill-[#FFB800] text-[#FFB800]" />
+                    <span className="font-semibold">{averageRating}</span>
+                    <span className="text-gray-500">({totalReviews} reviews)</span>
+                  </button>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-5 h-5 text-gray-600" />
+                    <span>45 mins</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5 text-gray-600" />
+                    <span>4 servings</span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Nutrition Info */}
+              <div className="grid grid-cols-4 gap-3 p-4 bg-[#F9F9F9] rounded-2xl mb-6">
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-[#FF6B35]">650</div>
+                  <div className="text-xs text-gray-600">Calories</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold text-[#4CAF50]">35g</div>
+                  <div className="text-xs text-gray-600">Protein</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">25g</div>
+                  <div className="text-xs text-gray-600">Fat</div>
+                </div>
+                <div className="text-center">
+                  <div className="text-2xl font-bold">48g</div>
+                  <div className="text-xs text-gray-600">Carbs</div>
+                </div>
+              </div>
+
+              <Separator className="my-6" />
+
+              {/* Ingredients Section with ref for scrolling */}
+              <div className="mb-6" ref={ingredientsRef}>
+                <h2 className="text-2xl font-bold mb-4">Ingredients</h2>
+                <div className="space-y-3">
+                  {ingredients.map((ingredient) => (
+                    <div key={ingredient.id} className="flex items-start gap-3">
+                      <Checkbox
+                        id={ingredient.id}
+                        checked={selectedIngredients.includes(ingredient.id)}
+                        onCheckedChange={() => toggleIngredient(ingredient.id)}
+                        className="mt-1"
+                      />
+                      <label htmlFor={ingredient.id} className="flex-1 cursor-pointer">
+                        <div className="flex items-baseline justify-between">
+                          <span className={selectedIngredients.includes(ingredient.id) ? 'line-through text-gray-500' : ''}>
+                            {ingredient.name}
+                          </span>
+                          {ingredient.inPantry && (
+                            <Badge variant="secondary" className="text-xs">In Pantry</Badge>
+                          )}
+                        </div>
+                        <div className="text-sm text-gray-500">{ingredient.amount}</div>
+                      </label>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              <Separator className="my-6" />
+
+              {/* Instructions */}
+              <div>
+                <h2 className="text-2xl font-bold mb-4">Instructions</h2>
+                <div className="space-y-4">
+                  {steps.map((step, idx) => (
+                    <div key={idx} className="flex gap-4">
+                      <div className="flex-shrink-0 w-8 h-8 rounded-full bg-[#FF6B35] text-white flex items-center justify-center font-semibold">
+                        {idx + 1}
+                      </div>
+                      <p className="flex-1 pt-1">{step}</p>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Reviews Section with ref for scrolling */}
+            <div className="bg-white md:rounded-3xl p-4 md:p-6 mb-4 md:mb-6" ref={reviewsRef} id="reviews-section">
+              <h2 className="text-2xl font-bold mb-6">Reviews ({totalReviews})</h2>
+              
+              {/* Rating Summary */}
+              <div className="flex items-center gap-6 mb-6 p-4 bg-[#F9F9F9] rounded-2xl">
+                <div className="text-center">
+                  <div className="text-5xl font-bold text-[#FF6B35] mb-1">{averageRating}</div>
+                  <div className="flex items-center gap-1 justify-center mb-1">
+                    {[1, 2, 3, 4, 5].map((star) => (
+                      <Star key={star} className="w-4 h-4 fill-[#FFB800] text-[#FFB800]" />
+                    ))}
+                  </div>
+                  <div className="text-sm text-gray-500">{totalReviews} reviews</div>
+                </div>
+                
+                <div className="flex-1 space-y-2">
+                  {[5, 4, 3, 2, 1].map((rating) => {
+                    const count = rating === 5 ? 78 : rating === 4 ? 32 : rating === 3 ? 8 : rating === 2 ? 2 : 0;
+                    const percentage = (count / totalReviews) * 100;
+                    return (
+                      <div key={rating} className="flex items-center gap-2">
+                        <span className="text-sm w-8">{rating}★</span>
+                        <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                          <div 
+                            className="h-full bg-[#FFB800]" 
+                            style={{ width: `${percentage}%` }}
+                          ></div>
+                        </div>
+                        <span className="text-sm text-gray-500 w-8">{count}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Individual Reviews */}
+              <div className="space-y-4">
+                {reviews.map((review) => (
+                  <div key={review.id} className="border-b border-gray-100 last:border-0 pb-4 last:pb-0">
+                    <div className="flex items-start gap-3 mb-3">
+                      <Avatar className="w-10 h-10 border-2 border-primary">
+                        <div className="bg-gradient-to-br from-primary to-orange-500 text-white flex items-center justify-center h-full w-full text-sm font-bold">
+                          {review.avatar}
+                        </div>
+                      </Avatar>
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="font-semibold">{review.author}</span>
+                          {review.verified && (
+                            <Badge className="bg-[#4CAF50] text-white text-xs">
+                              <CheckCircle2 className="w-3 h-3 mr-1" />
+                              Verified Cook
+                            </Badge>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 mb-2">
+                          <div className="flex">
+                            {[1, 2, 3, 4, 5].map((star) => (
+                              <Star 
+                                key={star} 
+                                className={`w-4 h-4 ${star <= review.rating ? 'fill-[#FFB800] text-[#FFB800]' : 'text-gray-300'}`} 
+                              />
+                            ))}
+                          </div>
+                          <span className="text-sm text-gray-500">{review.date}</span>
+                        </div>
+                        <p className="text-gray-700 mb-3">{review.comment}</p>
+                        <div className="flex items-center gap-4">
+                          <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-[#4CAF50] transition-colors">
+                            <ThumbsUp className="w-4 h-4" />
+                            <span>Helpful ({review.helpful})</span>
+                          </button>
+                          <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors">
+                            <MessageCircle className="w-4 h-4" />
+                            <span>Reply</span>
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              <Button variant="outline" className="w-full mt-6 rounded-full">
+                Load More Reviews
+              </Button>
+            </div>
+
+            {/* Creator Info */}
+            <div className="bg-white md:rounded-3xl p-4 md:p-6">
+              <h3 className="font-semibold mb-3">Recipe by</h3>
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-full bg-[#FF6B35] flex items-center justify-center text-white font-semibold text-lg">
+                  CM
+                </div>
+                <div className="flex-1">
+                  <div className="font-semibold">Chef Minh</div>
+                  <div className="text-sm text-gray-500">120 recipes · 45k followers</div>
+                </div>
+                <Button variant="outline" className="rounded-full">Follow</Button>
+              </div>
+            </div>
+          </div>
+
+          {/* Right Column - Shopping Panel (Desktop Sticky) */}
+          <div className="lg:col-span-1">
+            <div className="lg:sticky lg:top-4">
+              {/* Desktop: Sticky Panel */}
+              <div className="hidden lg:block bg-white rounded-3xl p-6 shadow-lg">
+                <h3 className="text-xl font-bold mb-4">Shop this Recipe</h3>
+                
+                <div className="space-y-3 mb-6">
+                  {ingredients.filter(i => !i.inPantry).map((ingredient) => {
+                    const isSelected = selectedIngredients.includes(ingredient.id);
+                    return (
+                      <div
+                        key={ingredient.id}
+                        className={`flex items-center justify-between p-3 rounded-xl transition-colors ${
+                          isSelected ? 'bg-[#FF6B35]/5' : 'bg-gray-50'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 flex-1">
+                          <Checkbox
+                            checked={isSelected}
+                            onCheckedChange={() => toggleIngredient(ingredient.id)}
+                          />
+                          <div className="flex-1">
+                            <div className="text-sm font-medium">{ingredient.name}</div>
+                            <div className="text-xs text-gray-500">{ingredient.amount}</div>
+                          </div>
+                        </div>
+                        <div className="font-semibold">${ingredient.price.toFixed(2)}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="space-y-2 mb-4">
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Subtotal:</span>
+                    <span className="font-medium">${totalPrice.toFixed(2)}</span>
+                  </div>
+                  <div className="flex justify-between text-sm">
+                    <span className="text-gray-600">Delivery:</span>
+                    <span className="font-medium text-[#4CAF50]">Free</span>
+                  </div>
+                </div>
+
+                <Separator className="my-4" />
+
+                <div className="flex justify-between items-center mb-4">
+                  <span className="font-semibold">Total:</span>
+                  <span className="text-2xl font-bold text-[#FF6B35]">${totalPrice.toFixed(2)}</span>
+                </div>
+
+                <Button className="w-full h-12 bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-full mb-3">
+                  <ShoppingCart className="w-5 h-5 mr-2" />
+                  Add to Cart & Delivery
+                </Button>
+
+                <div className="flex items-center justify-center gap-2 text-sm text-gray-500">
+                  <CheckCircle2 className="w-4 h-4 text-[#4CAF50]" />
+                  Delivery in 30-45 mins
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* STICKY ACTION BAR - "Cook vs Order" Concept (Mobile & Desktop Bottom) */}
+      <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t-2 border-gray-200 shadow-2xl lg:hidden">
+        <div className="max-w-7xl mx-auto px-4 py-4">
+          {/* Price Display */}
+          <div className="flex items-center justify-between mb-3">
+            <span className="text-sm text-gray-600">Ingredient Cost:</span>
+            <span className="text-xl font-bold text-[#FF6B35]">${totalPrice.toFixed(2)}</span>
+          </div>
+          
+          {/* Two Action Buttons */}
+          <div className="grid grid-cols-2 gap-3">
+            {/* Button A: Buy Ingredients (Primary Orange) */}
+            <Button
+              onClick={scrollToIngredients}
+              data-testid="btn-cook"
+              className="h-14 bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-2xl font-semibold text-sm transition-all hover:scale-105 shadow-lg"
+            >
+              <ChefHat className="w-5 h-5 mr-2" />
+              <div className="text-left">
+                <div>Cook It</div>
+                <div className="text-xs opacity-90">${totalPrice.toFixed(2)}</div>
+              </div>
+            </Button>
+
+            {/* Button B: Order Ready-Meal (Secondary Green) */}
+            <Button
+              onClick={handleOrderReadyMeal}
+              data-testid="btn-order"
+              className="h-14 bg-[#4CAF50] hover:bg-[#45a049] text-white rounded-2xl font-semibold text-sm transition-all hover:scale-105 shadow-lg"
+            >
+              <Bike className="w-5 h-5 mr-2" />
+              <div className="text-left">
+                <div>Order It</div>
+                <div className="text-xs opacity-90">from $5.00</div>
+              </div>
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Nearby Restaurants Modal */}
+      {/* TODO: Backend Integration - Connect this modal to real-time restaurant API */}
+      {/* API Endpoint: GET /api/restaurants/serving?dish_id=bun-cha&user_location={lat,lng} */}
+      <Dialog open={showRestaurantModal} onOpenChange={setShowRestaurantModal}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-2xl">Order Bún Chả from Nearby Restaurants</DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-4 mt-4">
+            {nearbyRestaurants.map((restaurant) => (
+              <Card key={restaurant.id} className="p-4 hover:shadow-lg transition-all cursor-pointer border-2 border-transparent hover:border-[#4CAF50]">
+                <div className="flex gap-4">
+                  <div className="relative w-24 h-24 rounded-2xl overflow-hidden flex-shrink-0">
+                    <img
+                      src={restaurant.image}
+                      alt={restaurant.name}
+                      className="w-full h-full object-cover"
+                    />
+                    <div className="absolute top-2 left-2 w-8 h-8 bg-white/90 backdrop-blur-sm rounded-full flex items-center justify-center text-lg">
+                      {restaurant.logo}
+                    </div>
+                  </div>
+
+                  <div className="flex-1">
+                    <h4 className="font-bold text-lg mb-1">{restaurant.name}</h4>
+                    
+                    <div className="flex items-center gap-3 text-sm text-gray-600 mb-2">
+                      <div className="flex items-center gap-1">
+                        <Star className="w-4 h-4 fill-[#FFB800] text-[#FFB800]" />
+                        <span className="font-medium">{restaurant.rating}</span>
+                        <span className="text-gray-400">({restaurant.reviews})</span>
+                      </div>
+                      <span>•</span>
+                      <span>{restaurant.distance}</span>
+                      <span>•</span>
+                      <span>{restaurant.deliveryTime}</span>
+                    </div>
+
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <div className="text-xl font-bold text-[#4CAF50]">${restaurant.price.toFixed(2)}</div>
+                        <div className="text-xs text-gray-500">
+                          {restaurant.deliveryFee === 0 ? (
+                            <span className="text-[#4CAF50] font-medium">Free Delivery</span>
+                          ) : (
+                            <span>+ ${restaurant.deliveryFee} delivery</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <Button 
+                        onClick={() => {
+                          // TODO: Navigate to restaurant detail page or add to cart
+                          onNavigate('restaurant-detail');
+                        }}
+                        className="bg-[#4CAF50] hover:bg-[#45a049] text-white rounded-full"
+                      >
+                        Order Now
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+              </Card>
+            ))}
+          </div>
+
+          <div className="mt-6 p-4 bg-blue-50 border border-blue-200 rounded-2xl">
+            <p className="text-sm text-blue-800">
+              💡 <strong>Tip:</strong> Ordering ready-made saves you 45 mins of cooking time! Perfect for busy days.
+            </p>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
+  );
+}
