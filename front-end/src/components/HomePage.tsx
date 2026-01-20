@@ -1,10 +1,14 @@
+'use client';
+
 import { useState } from 'react';
-import { Search, ShoppingCart, Bell, User, ChefHat, ShoppingBag, Star, Clock, Heart, CheckCircle, Users, Award, TrendingUp, Truck, MessageSquare, Smile, Meh, Frown, X } from 'lucide-react';
-import { Input } from './ui/input';
+import { ChefHat, ShoppingBag, Star, Clock, Heart, CheckCircle, Users, Award, TrendingUp, Truck, MessageSquare, Smile, Meh, Frown, X, Home, Utensils, Leaf, Store, MessageCircle, Cake } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Avatar } from './ui/avatar';
-import { Card } from './ui/card';
+import { Avatar } from './ui//avatar';
+import { Card } from './ui//card';
+import { Header } from './layout/Header';
+import { HeroSlider } from './HeroSlider';
+import { Footer } from './layout/Footer';
 
 interface HomePageProps {
   onNavigate: (page: string, recipeId?: string) => void;
@@ -53,37 +57,37 @@ const TESTIMONIALS = [
 // Testimonial Card Component
 function TestimonialCard({ testimonial }: { testimonial: typeof TESTIMONIALS[0] }) {
   return (
-    <Card className="p-6 bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col h-full">
-      {/* Header */}
-      <div className="flex items-center gap-3 mb-4">
-        <Avatar className="w-12 h-12 border-2 border-primary">
-          <div className="bg-gradient-to-br from-primary to-orange-500 text-white flex items-center justify-center h-full w-full font-bold">
-            {testimonial.avatar}
+      <Card className="p-6 bg-white rounded-xl shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1 flex flex-col h-full">
+        {/* Header */}
+        <div className="flex items-center gap-3 mb-4">
+          <Avatar className="w-12 h-12 border-2 border-primary">
+            <div className="bg-gradient-to-br from-primary to-orange-500 text-white flex items-center justify-center h-full w-full font-bold">
+              {testimonial.avatar}
+            </div>
+          </Avatar>
+          <div className="flex-1">
+            <div className="flex items-center gap-2">
+              <h4 className="font-semibold">{testimonial.name}</h4>
+              {testimonial.verified && (
+                  <CheckCircle className="w-4 h-4 text-[#4CAF50] fill-[#4CAF50]" />
+              )}
+            </div>
+            <p className="text-sm text-gray-500">{testimonial.role}</p>
           </div>
-        </Avatar>
-        <div className="flex-1">
-          <div className="flex items-center gap-2">
-            <h4 className="font-semibold">{testimonial.name}</h4>
-            {testimonial.verified && (
-              <CheckCircle className="w-4 h-4 text-[#4CAF50] fill-[#4CAF50]" />
-            )}
-          </div>
-          <p className="text-sm text-gray-500">{testimonial.role}</p>
         </div>
-      </div>
 
-      {/* Rating */}
-      <div className="flex gap-1 mb-3">
-        {[...Array(testimonial.rating)].map((_, i) => (
-          <Star key={i} className="w-4 h-4 fill-[#FFB800] text-[#FFB800]" />
-        ))}
-      </div>
+        {/* Rating */}
+        <div className="flex gap-1 mb-3">
+          {[...Array(testimonial.rating)].map((_, i) => (
+              <Star key={i} className="w-4 h-4 fill-[#FFB800] text-[#FFB800]" />
+          ))}
+        </div>
 
-      {/* Quote */}
-      <p className="text-gray-700 leading-relaxed flex-1">
-        "{testimonial.quote}"
-      </p>
-    </Card>
+        {/* Quote */}
+        <p className="text-gray-700 leading-relaxed flex-1">
+          "{testimonial.quote}"
+        </p>
+      </Card>
   );
 }
 
@@ -105,65 +109,123 @@ function FeedbackModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => vo
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end justify-end p-4 md:p-6 pointer-events-none">
-      <div className="pointer-events-auto bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border-2 border-gray-100 animate-in slide-in-from-bottom-4 duration-300">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="font-bold text-lg">How is your experience?</h3>
-          <button
-            onClick={onClose}
-            className="p-1 hover:bg-gray-100 rounded-full transition-colors"
-          >
-            <X className="w-5 h-5 text-gray-500" />
-          </button>
-        </div>
-
-        {!submitted ? (
-          <>
-            <p className="text-gray-600 text-sm mb-6">
-              Your feedback helps us improve Tastepedia!
-            </p>
-
-            {/* Emoji Buttons */}
-            <div className="flex gap-3 justify-center">
-              <button
-                onClick={() => handleSubmit('sad')}
-                className="flex flex-col items-center gap-2 p-4 rounded-2xl hover:bg-red-50 transition-all hover:scale-110 group"
-              >
-                <Frown className="w-12 h-12 text-red-500 group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-medium text-gray-700">Not Good</span>
-              </button>
-
-              <button
-                onClick={() => handleSubmit('neutral')}
-                className="flex flex-col items-center gap-2 p-4 rounded-2xl hover:bg-yellow-50 transition-all hover:scale-110 group"
-              >
-                <Meh className="w-12 h-12 text-yellow-500 group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-medium text-gray-700">Okay</span>
-              </button>
-
-              <button
-                onClick={() => handleSubmit('happy')}
-                className="flex flex-col items-center gap-2 p-4 rounded-2xl hover:bg-green-50 transition-all hover:scale-110 group"
-              >
-                <Smile className="w-12 h-12 text-[#4CAF50] group-hover:scale-110 transition-transform" />
-                <span className="text-sm font-medium text-gray-700">Amazing!</span>
-              </button>
-            </div>
-          </>
-        ) : (
-          <div className="text-center py-8">
-            <div className="w-16 h-16 bg-[#4CAF50] rounded-full flex items-center justify-center mx-auto mb-4">
-              <CheckCircle className="w-8 h-8 text-white" />
-            </div>
-            <h4 className="font-bold text-lg mb-2">Thank you!</h4>
-            <p className="text-gray-600">Your feedback has been recorded.</p>
+      <div className="fixed inset-0 z-50 flex items-end justify-end p-4 md:p-6 pointer-events-none">
+        <div className="pointer-events-auto bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm border-2 border-gray-100 animate-in slide-in-from-bottom-4 duration-300">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="font-bold text-lg">How is your experience?</h3>
+            <button
+                onClick={onClose}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+            >
+              <X className="w-5 h-5 text-gray-500" />
+            </button>
           </div>
-        )}
+
+          {!submitted ? (
+              <>
+                <p className="text-gray-600 text-sm mb-6">
+                  Your feedback helps us improve Tastepedia!
+                </p>
+
+                {/* Emoji Buttons */}
+                <div className="flex gap-3 justify-center">
+                  <button
+                      onClick={() => handleSubmit('sad')}
+                      className="flex flex-col items-center gap-2 p-4 rounded-2xl hover:bg-red-50 transition-all hover:scale-110 group"
+                  >
+                    <Frown className="w-12 h-12 text-red-500 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-medium text-gray-700">Not Good</span>
+                  </button>
+
+                  <button
+                      onClick={() => handleSubmit('neutral')}
+                      className="flex flex-col items-center gap-2 p-4 rounded-2xl hover:bg-yellow-50 transition-all hover:scale-110 group"
+                  >
+                    <Meh className="w-12 h-12 text-yellow-500 group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-medium text-gray-700">Okay</span>
+                  </button>
+
+                  <button
+                      onClick={() => handleSubmit('happy')}
+                      className="flex flex-col items-center gap-2 p-4 rounded-2xl hover:bg-green-50 transition-all hover:scale-110 group"
+                  >
+                    <Smile className="w-12 h-12 text-[#4CAF50] group-hover:scale-110 transition-transform" />
+                    <span className="text-sm font-medium text-gray-700">Amazing!</span>
+                  </button>
+                </div>
+              </>
+          ) : (
+              <div className="text-center py-8">
+                <div className="w-16 h-16 bg-[#4CAF50] rounded-full flex items-center justify-center mx-auto mb-4">
+                  <CheckCircle className="w-8 h-8 text-white" />
+                </div>
+                <h4 className="font-bold text-lg mb-2">Thank you!</h4>
+                <p className="text-gray-600">Your feedback has been recorded.</p>
+              </div>
+          )}
+        </div>
       </div>
-    </div>
   );
 }
+
+// Categories Data với gradient và icon đẹp
+const categories = [
+  {
+    id: 'vietnamese',
+    label: 'Vietnamese',
+    icon: '🇻🇳',
+    gradient: 'from-red-500 to-orange-500',
+    count: '125+ Recipes',
+    description: 'Authentic flavors',
+    iconComponent: <Home className="w-8 h-8 text-white" />
+  },
+  {
+    id: 'restaurants',
+    label: 'Restaurants',
+    icon: '🍽️',
+    gradient: 'from-blue-500 to-purple-500',
+    count: '50+ Partners',
+    description: 'Local & chain',
+    iconComponent: <Utensils className="w-8 h-8 text-white" />
+  },
+  {
+    id: 'keto',
+    label: 'Keto',
+    icon: '🥗',
+    gradient: 'from-green-500 to-emerald-500',
+    count: '75+ Recipes',
+    description: 'Low carb meals',
+    iconComponent: <Leaf className="w-8 h-8 text-white" />
+  },
+  {
+    id: 'marketplace',
+    label: 'Marketplace',
+    icon: '🛒',
+    gradient: 'from-yellow-500 to-amber-500',
+    count: 'Fresh ingredients',
+    description: '30-min delivery',
+    iconComponent: <Store className="w-8 h-8 text-white" />
+  },
+  {
+    id: 'community',
+    label: 'Community',
+    icon: '💬',
+    gradient: 'from-pink-500 to-rose-500',
+    count: '10K+ Members',
+    description: 'Share & learn',
+    iconComponent: <MessageCircle className="w-8 h-8 text-white" />
+  },
+  {
+    id: 'dessert',
+    label: 'Dessert',
+    icon: '🍰',
+    gradient: 'from-purple-500 to-pink-500',
+    count: '200+ Recipes',
+    description: 'Sweet treats',
+    iconComponent: <Cake className="w-8 h-8 text-white" />
+  },
+];
 
 export function HomePage({ onNavigate }: HomePageProps) {
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -219,15 +281,6 @@ export function HomePage({ onNavigate }: HomePageProps) {
     },
   ];
 
-  const categories = [
-    { icon: '🇻🇳', label: 'Vietnamese', action: 'search' },
-    { icon: '🍽️', label: 'Restaurants', action: 'restaurants' },
-    { icon: '🥗', label: 'Keto', action: 'search' },
-    { icon: '🛒', label: 'Marketplace', action: 'marketplace' },
-    { icon: '💬', label: 'Community', action: 'community' },
-    { icon: '🍰', label: 'Dessert', action: 'search' },
-  ];
-
   // Trusted Stats Data
   const trustedStats = [
     { icon: Star, label: '4.9/5 App Rating', value: '10,000+ Reviews', color: 'text-[#FFB800]' },
@@ -237,215 +290,196 @@ export function HomePage({ onNavigate }: HomePageProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-[#F9F9F9] pb-20 md:pb-8">
-      {/* Header */}
-      <header className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3 md:py-4">
-          <div className="flex items-center gap-4">
-            {/* Logo */}
-            <div className="text-2xl font-bold text-[#FF6B35] hidden md:block">Tastepedia</div>
-            
-            {/* Search Bar */}
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <Input
-                placeholder="Ingredient or Dish name..."
-                className="pl-10 pr-4 h-11 rounded-full bg-[#F9F9F9] border-0"
-              />
-            </div>
+      <div className="min-h-screen bg-[#F9F9F9] flex flex-col">
+        {/* Header with Auth Check */}
+        <Header onNavigate={onNavigate} />
 
-            {/* Icons */}
-            <div className="flex items-center gap-2 md:gap-3">
-              <button 
-                onClick={() => onNavigate('cart')}
-                className="relative p-2 hover:bg-muted rounded-full transition-colors"
-              >
-                <ShoppingCart className="w-6 h-6 text-foreground" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-primary text-white text-xs border-2 border-background">
-                  3
-                </Badge>
-              </button>
-              <button 
-                onClick={() => onNavigate('notifications')}
-                className="relative p-2 hover:bg-muted rounded-full transition-colors hidden md:block"
-              >
-                <Bell className="w-6 h-6 text-foreground" />
-                <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-primary text-white text-xs border-2 border-background">
-                  2
-                </Badge>
-              </button>
-              <button 
-                onClick={() => onNavigate('profile')}
-                className="hidden md:block"
-              >
-                <Avatar className="h-9 w-9 border-2 border-border hover:border-primary transition-colors">
-                  <div className="bg-primary text-white flex items-center justify-center h-full w-full">
-                    <User className="w-5 h-5" />
-                  </div>
-                </Avatar>
-              </button>
-            </div>
-          </div>
-        </div>
-      </header>
+        {/* Main Content */}
+        <div className="flex-1">
+          <div className="max-w-7xl mx-auto px-4 py-6 md:py-8">
+            {/* Hero Slider */}
+            <HeroSlider />
 
-      {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 py-6 md:py-8">
-        {/* Hero Section */}
-        <div className="bg-gradient-to-br from-[#FF6B35] to-[#ff8a5c] rounded-3xl p-8 md:p-12 text-white mb-6 shadow-lg">
-          <h1 className="text-3xl md:text-5xl font-bold mb-4">
-            Don't know what to cook?
-          </h1>
-          <p className="text-lg md:text-xl mb-6 opacity-90">
-            Let AI suggest recipes based on your ingredients
-          </p>
-          <div className="flex flex-col sm:flex-row gap-3">
-            <Button className="bg-white text-[#FF6B35] hover:bg-gray-100 h-12 rounded-full px-6">
-              <ChefHat className="w-5 h-5 mr-2" />
-              Ask AI Chef
-            </Button>
-            <Button variant="outline" className="bg-transparent border-2 border-white text-white hover:bg-white/10 h-12 rounded-full px-6">
-              <ShoppingBag className="w-5 h-5 mr-2" />
-              Shop Ingredients
-            </Button>
-          </div>
-        </div>
-
-        {/* TRUSTED STATS STRIP - Glassmorphism */}
-        <div className="bg-white/60 backdrop-blur-xl border border-gray-200/50 rounded-2xl p-6 mb-8 shadow-lg animate-in fade-in duration-700">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
-            {trustedStats.map((stat, idx) => (
-              <div
-                key={idx}
-                className="flex flex-col items-center text-center p-4 rounded-xl hover:bg-white/80 transition-all duration-300 hover:scale-105"
-              >
-                <stat.icon className={`w-8 h-8 md:w-10 md:h-10 mb-3 ${stat.color}`} />
-                <div className="font-bold text-lg md:text-xl text-gray-900">{stat.label}</div>
-                <div className="text-sm text-gray-600 mt-1">{stat.value}</div>
+            {/* TRUSTED STATS STRIP - Glassmorphism */}
+            <div className="bg-white/60 backdrop-blur-xl border border-gray-200/50 rounded-2xl p-6 mb-8 shadow-lg animate-in fade-in duration-700">
+              <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
+                {trustedStats.map((stat, idx) => (
+                    <div
+                        key={idx}
+                        className="flex flex-col items-center text-center p-4 rounded-xl hover:bg-white/80 transition-all duration-300 hover:scale-105 min-w-[100px]"
+                    >
+                      <stat.icon className={`w-8 h-8 md:w-10 md:h-10 mb-3 ${stat.color}`} />
+                      <div className="font-bold text-lg md:text-xl text-gray-900">{stat.label}</div>
+                      <div className="text-sm text-gray-600 mt-1">{stat.value}</div>
+                    </div>
+                ))}
               </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Smart Categories */}
-        <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">Explore Categories</h2>
-          <div className="flex gap-3 overflow-x-auto pb-2 no-scrollbar">
-            {categories.map((cat, idx) => (
-              <button
-                key={idx}
-                onClick={() => onNavigate(cat.action)}
-                className="flex-shrink-0 flex flex-col items-center gap-2 p-4 bg-white rounded-2xl shadow-sm hover:shadow-md transition-all hover:scale-105 min-w-[100px]"
-              >
-                <span className="text-3xl">{cat.icon}</span>
-                <span className="text-sm font-medium text-gray-700">{cat.label}</span>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* What's in your Fridge Section */}
-        <div className="bg-gradient-to-r from-[#4CAF50]/10 to-[#4CAF50]/5 border-2 border-[#4CAF50]/20 rounded-2xl p-6 mb-8">
-          <h3 className="text-xl font-bold mb-2">🥕 What's in your Fridge?</h3>
-          <p className="text-gray-600 mb-4">Input your available ingredients and we'll find the perfect recipe</p>
-          <Button className="bg-[#4CAF50] hover:bg-[#45a049] text-white rounded-full">
-            Start Cooking Smart
-          </Button>
-        </div>
-
-        {/* Trending Recipes */}
-        <div className="mb-12">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold">Trending Recipes</h2>
-            <button className="text-[#FF6B35] font-medium hover:underline">View All</button>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
-            {trendingRecipes.map((recipe) => (
-              <button
-                key={recipe.id}
-                onClick={() => onNavigate('recipe', recipe.id)}
-                className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
-              >
-                <div className="relative aspect-[4/3] overflow-hidden">
-                  <img
-                    src={recipe.image}
-                    alt={recipe.title}
-                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
-                  />
-                  <button className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors">
-                    <Heart className="w-5 h-5 text-gray-700" />
-                  </button>
-                  <Badge className="absolute bottom-3 left-3 bg-[#4CAF50] text-white">
-                    {recipe.price}
-                  </Badge>
-                </div>
-                <div className="p-4">
-                  <h3 className="font-semibold text-lg mb-2 text-left">{recipe.title}</h3>
-                  <div className="flex items-center justify-between text-sm text-gray-600">
-                    <div className="flex items-center gap-1">
-                      <Star className="w-4 h-4 fill-[#FFB800] text-[#FFB800]" />
-                      <span className="font-medium">{recipe.rating}</span>
-                    </div>
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-4 h-4" />
-                      <span>{recipe.time} mins</span>
-                    </div>
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* TESTIMONIALS SECTION - "What Foodies Say" */}
-        <div className="mb-12">
-          <div className="text-center mb-8">
-            <div className="inline-flex items-center gap-2 bg-[#FF6B35]/10 px-4 py-2 rounded-full mb-4">
-              <TrendingUp className="w-4 h-4 text-[#FF6B35]" />
-              <span className="text-sm font-semibold text-[#FF6B35]">TRUSTED BY THOUSANDS</span>
             </div>
-            <h2 className="text-3xl md:text-4xl font-bold mb-3">What Foodies Say</h2>
-            <p className="text-gray-600 text-lg">
-              Join 10,000+ happy users who transformed their cooking experience
-            </p>
-          </div>
 
-          {/* Testimonials Grid */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            {TESTIMONIALS.map((testimonial) => (
-              <TestimonialCard key={testimonial.id} testimonial={testimonial} />
-            ))}
-          </div>
+            {/* IMPROVED: Explore Categories */}
+            <div className="mb-12">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-3xl font-bold text-gray-900 mb-2">Explore Categories</h2>
+                  <p className="text-gray-600">Discover delicious options curated just for you</p>
+                </div>
+                <button className="text-[#FF6B35] font-semibold hover:underline flex items-center gap-2">
+                  View all
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
 
-          {/* CTA Button */}
-          <div className="text-center">
-            <Button
-              onClick={() => onNavigate('community')}
-              variant="outline"
-              className="h-12 px-8 rounded-full border-2 border-[#FF6B35] text-[#FF6B35] hover:bg-[#FF6B35] hover:text-white transition-all hover:scale-105"
-            >
-              <Star className="w-5 h-5 mr-2" />
-              Read all 2,000+ reviews
-            </Button>
-            <p className="text-sm text-gray-500 mt-3">
-              Average rating: <span className="font-bold text-[#FFB800]">4.9/5</span> ⭐
-            </p>
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+                {categories.map((category) => (
+                    <button
+                        key={category.id}
+                        onClick={() => onNavigate(category.id === 'restaurants' ? 'restaurants' : 'search')}
+                        className="group relative bg-white rounded-2xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 overflow-hidden"
+                    >
+                      {/* Gradient Background */}
+                      <div className={`absolute inset-0 bg-gradient-to-br ${category.gradient} opacity-0 group-hover:opacity-10 transition-opacity duration-300`}></div>
+
+                      {/* Main Content */}
+                      <div className="p-5 flex flex-col items-center text-center h-full">
+                        {/* Icon Container */}
+                        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${category.gradient} flex items-center justify-center mb-4 shadow-lg group-hover:scale-110 transition-transform duration-300`}>
+                          <div className="text-2xl font-bold">{category.icon}</div>
+                        </div>
+
+                        {/* Label */}
+                        <h3 className="font-bold text-lg text-gray-900 mb-2 group-hover:text-[#FF6B35] transition-colors">
+                          {category.label}
+                        </h3>
+
+                        {/* Count */}
+                        <div className="text-sm font-semibold text-gray-700 mb-1">
+                          {category.count}
+                        </div>
+
+                        {/* Description */}
+                        <div className="text-xs text-gray-500">
+                          {category.description}
+                        </div>
+
+                        {/* Hover Indicator */}
+                        <div className="mt-4 w-8 h-1 bg-gradient-to-r from-transparent via-[#FF6B35] to-transparent opacity-0 group-hover:opacity-100 transition-all duration-300"></div>
+                      </div>
+
+                      {/* Corner Decoration */}
+                      <div className="absolute top-0 right-0 w-6 h-6 border-t-2 border-r-2 border-[#FF6B35] border-opacity-0 group-hover:border-opacity-100 transition-all duration-300 rounded-tr-2xl"></div>
+                    </button>
+                ))}
+              </div>
+            </div>
+
+            {/* What's in your Fridge Section */}
+            <div className="bg-gradient-to-r from-[#4CAF50]/10 to-[#4CAF50]/5 border-2 border-[#4CAF50]/20 rounded-2xl p-6 mb-8">
+              <h3 className="text-xl font-bold mb-2">🥕 What's in your Fridge?</h3>
+              <p className="text-gray-600 mb-4">Input your available ingredients and we'll find the perfect recipe</p>
+              <Button className="bg-[#4CAF50] hover:bg-[#45a049] text-white rounded-full">
+                Start Cooking Smart
+              </Button>
+            </div>
+
+            {/* Trending Recipes */}
+            <div className="mb-12">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-2xl font-bold">Trending Recipes</h2>
+                <button className="text-[#FF6B35] font-medium hover:underline">View All</button>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                {trendingRecipes.map((recipe) => (
+                    <button
+                        key={recipe.id}
+                        onClick={() => onNavigate('recipe', recipe.id)}
+                        className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                    >
+                      <div className="relative aspect-[4/3] overflow-hidden">
+                        <img
+                            src={recipe.image || "/placeholder.svg"}
+                            alt={recipe.title}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                        />
+                        <button className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors">
+                          <Heart className="w-5 h-5 text-gray-700" />
+                        </button>
+                        <Badge className="absolute bottom-3 left-3 bg-[#4CAF50] text-white">
+                          {recipe.price}
+                        </Badge>
+                      </div>
+                      <div className="p-4">
+                        <h3 className="font-semibold text-lg mb-2 text-left">{recipe.title}</h3>
+                        <div className="flex items-center justify-between text-sm text-gray-600">
+                          <div className="flex items-center gap-1">
+                            <Star className="w-4 h-4 fill-[#FFB800] text-[#FFB800]" />
+                            <span className="font-medium">{recipe.rating}</span>
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <Clock className="w-4 h-4" />
+                            <span>{recipe.time} mins</span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                ))}
+              </div>
+            </div>
+
+            {/* TESTIMONIALS SECTION - "What Foodies Say" */}
+            <div className="mb-12">
+              <div className="text-center mb-8">
+                <div className="inline-flex items-center gap-2 bg-[#FF6B35]/10 px-4 py-2 rounded-full mb-4">
+                  <TrendingUp className="w-4 h-4 text-[#FF6B35]" />
+                  <span className="text-sm font-semibold text-[#FF6B35]">TRUSTED BY THOUSANDS</span>
+                </div>
+                <h2 className="text-3xl md:text-4xl font-bold mb-3">What Foodies Say</h2>
+                <p className="text-gray-600 text-lg">
+                  Join 10,000+ happy users who transformed their cooking experience
+                </p>
+              </div>
+
+              {/* Testimonials Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+                {TESTIMONIALS.map((testimonial) => (
+                    <TestimonialCard key={testimonial.id} testimonial={testimonial} />
+                ))}
+              </div>
+
+              {/* CTA Button */}
+              <div className="text-center">
+                <Button
+                    onClick={() => onNavigate('community')}
+                    variant="outline"
+                    className="h-12 px-8 rounded-full border-2 border-[#FF6B35] text-[#FF6B35] hover:bg-[#FF6B35] hover:text-white transition-all hover:scale-105"
+                >
+                  <Star className="w-5 h-5 mr-2" />
+                  Read all 2,000+ reviews
+                </Button>
+                <p className="text-sm text-gray-500 mt-3">
+                  Average rating: <span className="font-bold text-[#FFB800]">4.9/5</span> ⭐
+                </p>
+              </div>
+            </div>
           </div>
         </div>
+
+        {/* FLOATING FEEDBACK BUTTON */}
+        <button
+            onClick={() => setFeedbackOpen(true)}
+            className="fixed bottom-24 md:bottom-8 right-4 md:right-6 z-50 bg-gradient-to-br from-[#FF6B35] to-[#ff5722] text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-all duration-300 group"
+        >
+          <MessageSquare className="w-6 h-6 group-hover:scale-110 transition-transform" />
+          <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#4CAF50] rounded-full animate-pulse"></div>
+        </button>
+
+        {/* Feedback Modal */}
+        <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
+
+        {/* Footer */}
+        <Footer onNavigate={onNavigate} />
       </div>
-
-      {/* FLOATING FEEDBACK BUTTON */}
-      <button
-        onClick={() => setFeedbackOpen(true)}
-        className="fixed bottom-24 md:bottom-8 right-4 md:right-6 z-50 bg-gradient-to-br from-[#FF6B35] to-[#ff5722] text-white p-4 rounded-full shadow-2xl hover:scale-110 transition-all duration-300 group"
-      >
-        <MessageSquare className="w-6 h-6 group-hover:scale-110 transition-transform" />
-        <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#4CAF50] rounded-full animate-pulse"></div>
-      </button>
-
-      {/* Feedback Modal */}
-      <FeedbackModal isOpen={feedbackOpen} onClose={() => setFeedbackOpen(false)} />
-    </div>
   );
 }

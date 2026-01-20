@@ -4,7 +4,16 @@ public class SignupRequest {
     private String fullName;
     private String email;
     private String password;
+    private String username;
     private boolean wantsToBeCreator; // Hứng cái checkbox "I want to be Creator"
+
+    public String getUsername() {
+        return username;
+    }
+
+    public void setUsername(String username) {
+        this.username = username;
+    }
 
     // --- Getters và Setters (Bắt buộc phải có để Spring đọc được dữ liệu) ---
     public String getFullName() { return fullName; }
