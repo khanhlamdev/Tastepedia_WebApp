@@ -2,12 +2,21 @@
 
 import React, { useState } from 'react';
 import axios from 'axios';
-// 1. IMPORT THÊM useGoogleLogin
 import { useGoogleLogin } from '@react-oauth/google';
 import { Mail, Lock, User, Facebook, Eye, EyeOff, KeyRound } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Checkbox } from './ui/checkbox';
+
+// 1. Định nghĩa kiểu dữ liệu User để không dùng 'any' nữa
+interface UserData {
+  id: string;
+  fullName: string;
+  email: string;
+  role: string;
+  username?: string;
+  // ... thêm các trường khác nếu backend trả về
+}
 
 interface AuthPageProps {
   onComplete: () => void;
@@ -33,47 +42,50 @@ export function AuthPage({ onComplete, onNavigate }: AuthPageProps) {
   const [otp, setOtp] = useState('');
   const [wantsToBeCreator, setWantsToBeCreator] = useState(false);
 
+  // State riêng cho Forgot Password
+  const [forgotEmail, setForgotEmail] = useState('');
+
   const handleSkip = () => {
     if (onNavigate) onNavigate('home');
     else onComplete();
   };
 
-  // 2. HÀM XỬ LÝ GOOGLE LOGIN (MỚI THÊM)
+  // --- HÀM HELPER: LƯU USER VÀO LOCAL STORAGE ---
+  const handleAuthSuccess = (userData: UserData) => {
+    localStorage.setItem("user", JSON.stringify(userData));
+    // Nếu bạn muốn test RecipeManager ngay, có thể hardcode ID tạm thời nếu backend chưa trả về ID
+    // if (!userData.id) userData.id = "user123";
+
+    alert(`👋 Chào mừng ${userData.fullName}!`);
+    onComplete(); // Chuyển vào trang chính
+  };
+
+  // 2. XỬ LÝ GOOGLE LOGIN
   const handleGoogleLogin = useGoogleLogin({
     onSuccess: async (tokenResponse) => {
       try {
         setIsLoading(true);
-        // B1: Lấy thông tin user từ Google
+        // B1: Lấy thông tin từ Google
         const userInfo = await axios.get(
             'https://www.googleapis.com/oauth2/v3/userinfo',
             { headers: { Authorization: `Bearer ${tokenResponse.access_token}` } }
         );
 
-        // B2: Gửi về Backend xử lý
-        // Gửi kèm type để Backend biết đang là Đăng nhập hay Đăng ký
+        // B2: Gửi về Backend (Nhớ backend phải bật withCredentials để nhận cookie session)
         const res = await axios.post(`${API_URL}/google`, {
           email: userInfo.data.email,
           fullName: userInfo.data.name,
           googleId: userInfo.data.sub,
           type: isLogin ? "LOGIN" : "SIGNUP"
-        });
+        }, { withCredentials: true }); // <--- QUAN TRỌNG: Gửi cookie session
 
         // B3: Thành công
-        alert(isLogin ? "🎉 Đăng nhập Google thành công!" : "🎉 Đăng ký Google thành công! Bạn đã được tự động đăng nhập.");
-
-        localStorage.setItem("user", JSON.stringify(res.data));
-
-        // Nếu đang ở tab Đăng ký mà thành công thì chuyển trạng thái
-        if (!isLogin) {
-          setIsLogin(true);
-        }
-        onComplete(); // Vào trang chủ
+        handleAuthSuccess(res.data);
 
       } catch (error: any) {
         console.error("Lỗi Google:", error);
-        // B4: Bắt lỗi logic từ Backend (Ví dụ: Chưa đăng ký mà đòi Login)
-        const message = error.response?.data || "Có lỗi xảy ra khi kết nối Google";
-        alert("⚠️ Lỗi: " + message);
+        const message = error.response?.data || "Lỗi kết nối Google";
+        alert("⚠️ " + message);
       } finally {
         setIsLoading(false);
       }
@@ -81,7 +93,7 @@ export function AuthPage({ onComplete, onNavigate }: AuthPageProps) {
     onError: () => alert('Đăng nhập Google thất bại!'),
   });
 
-  // --- HÀM XỬ LÝ SIGNUP / SIGNIN THƯỜNG ---
+  // --- XỬ LÝ SIGNUP / SIGNIN ---
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
@@ -105,9 +117,10 @@ export function AuthPage({ onComplete, onNavigate }: AuthPageProps) {
           alert("✅ Đã gửi mã OTP về email! Vui lòng kiểm tra.");
           setStep(2);
         } else {
+          // Verify OTP
           await axios.post(`${API_URL}/verify`, { email, otp });
           alert("🎉 Kích hoạt tài khoản thành công! Bạn có thể đăng nhập ngay.");
-          setIsLogin(true);
+          setIsLogin(true); // Chuyển sang tab đăng nhập
           setStep(1);
           setPassword('');
           setConfirmPassword('');
@@ -115,10 +128,10 @@ export function AuthPage({ onComplete, onNavigate }: AuthPageProps) {
         }
       } else {
         // === SIGN IN ===
-        const response = await axios.post(`${API_URL}/signin`, { email, password });
-        alert(`👋 Chào mừng ${response.data.fullName} quay trở lại!`);
-        localStorage.setItem("user", JSON.stringify(response.data));
-        onComplete();
+        // Thêm withCredentials: true để nhận cookie session từ backend
+        const response = await axios.post(`${API_URL}/signin`, { email, password }, { withCredentials: true });
+
+        handleAuthSuccess(response.data);
       }
     } catch (error: any) {
       console.error("Lỗi:", error);
@@ -131,7 +144,6 @@ export function AuthPage({ onComplete, onNavigate }: AuthPageProps) {
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
-    const forgotEmail = (e.target as any)[0].value;
     if (!forgotEmail) { alert("Vui lòng nhập Email!"); return; }
 
     try {
@@ -141,6 +153,7 @@ export function AuthPage({ onComplete, onNavigate }: AuthPageProps) {
       });
       alert('✅ Thành công! Hãy kiểm tra email để lấy mật khẩu mới.');
       setShowForgotPassword(false);
+      setForgotEmail(''); // Reset field
     } catch (error: any) {
       const message = error.response?.data || "Lỗi kết nối server!";
       alert("⚠️ " + message);
@@ -165,7 +178,17 @@ export function AuthPage({ onComplete, onNavigate }: AuthPageProps) {
               <h2 className="text-3xl font-bold mb-2">Reset Password</h2>
               <p className="text-gray-600 mb-8">Enter your email to receive a new password.</p>
               <form className="space-y-4" onSubmit={handleForgotPassword}>
-                <div className="relative"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input type="email" placeholder="Enter your email" className="pl-10 h-12 rounded-2xl bg-[#F9F9F9]" required /></div>
+                <div className="relative">
+                  <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+                  <Input
+                      type="email"
+                      placeholder="Enter your email"
+                      className="pl-10 h-12 rounded-2xl bg-[#F9F9F9]"
+                      value={forgotEmail}
+                      onChange={(e) => setForgotEmail(e.target.value)}
+                      required
+                  />
+                </div>
                 <Button type="submit" disabled={isLoading} className="w-full h-12 rounded-2xl bg-[#FF6B35] hover:bg-[#ff5722] text-white">{isLoading ? 'Sending...' : 'Send New Password'}</Button>
               </form>
             </div>
@@ -174,8 +197,10 @@ export function AuthPage({ onComplete, onNavigate }: AuthPageProps) {
     );
   }
 
+  // ... (Phần render chính giữ nguyên như cũ) ...
   return (
       <div className="min-h-screen flex flex-col md:flex-row">
+        {/* ... (Phần ảnh bên trái giữ nguyên) ... */}
         <div className="hidden md:flex md:w-1/2 bg-cover bg-center relative" style={{ backgroundImage: `url('https://images.unsplash.com/photo-1693743387915-7d190a0e636f?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxkaW5pbmclMjB0YWJsZSUyMGZvb2R8ZW58MXx8fHwxNzY4NTIzMjkzfDA&ixlib=rb-4.1.0&q=80&w=1080')` }}>
           <div className="absolute inset-0 bg-gradient-to-br from-[#FF6B35]/90 to-[#4CAF50]/70 backdrop-blur-sm"></div>
           <div className="relative z-10 flex flex-col justify-center items-center text-white p-12">
@@ -224,23 +249,20 @@ export function AuthPage({ onComplete, onNavigate }: AuthPageProps) {
                 </div>
             )}
 
-            {/* 3. NÚT GOOGLE ĐÃ GẮN LOGIC - Hiển thị ở cả Login và Signup (trừ bước OTP) */}
+            {/* GOOGLE LOGIN */}
             {step === 1 && (
                 <div className="mt-6">
                   <div className="relative"><div className="absolute inset-0 flex items-center"><div className="w-full border-t border-gray-300"></div></div><div className="relative flex justify-center text-sm"><span className="px-4 bg-white text-gray-500">Or continue with</span></div></div>
                   <div className="mt-6 grid grid-cols-2 gap-3">
-                    {/* NÚT GOOGLE XỊN */}
                     <Button
                         type="button"
                         variant="outline"
                         className="h-12 rounded-2xl bg-transparent flex items-center justify-center gap-2"
-                        onClick={() => handleGoogleLogin()} // Gọi hàm Google
+                        onClick={() => handleGoogleLogin()}
                     >
                       <svg className="w-5 h-5" viewBox="0 0 24 24"><path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4" /><path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853" /><path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" fill="#FBBC05" /><path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335" /></svg>
                       Google
                     </Button>
-
-                    {/* Nút Facebook (Để chơi cho đẹp thôi) */}
                     <Button variant="outline" className="h-12 rounded-2xl bg-transparent flex items-center justify-center gap-2">
                       <Facebook className="w-5 h-5 text-blue-600" /> Facebook
                     </Button>
