@@ -23,31 +23,34 @@ import { FoodOrderTrackingPage } from './components/FoodOrderTrackingPage';
 import { CommunityPage } from './components/CommunityPage';
 import { IngredientMarketplacePage } from './components/IngredientMarketplacePage';
 import { MobileNavigation } from './components/MobileNavigation';
+// 1. IMPORT TRANG ĐĂNG BÀI MỚI
+import { RecipeManager } from './components/RecipeManager';
 
-type AppState = 
-  | 'auth' 
-  | 'onboarding' 
-  | 'home' 
-  | 'search' 
-  | 'recipe' 
-  | 'reels' 
-  | 'planner' 
-  | 'chat'
-  | 'cart' 
-  | 'checkout-shipping'
-  | 'checkout-payment'
-  | 'tracking' 
-  | 'profile'
-  | 'wallet'
-  | 'notifications'
-  | 'settings'
-  | 'creator'
-  | 'restaurants'
-  | 'restaurant-detail'
-  | 'food-tracking'
-  | 'community'
-  | 'marketplace'
-  | '404';
+type AppState =
+    | 'auth'
+    | 'onboarding'
+    | 'home'
+    | 'search'
+    | 'recipe'
+    | 'reels'
+    | 'planner'
+    | 'chat'
+    | 'cart'
+    | 'checkout-shipping'
+    | 'checkout-payment'
+    | 'tracking'
+    | 'profile'
+    | 'wallet'
+    | 'notifications'
+    | 'settings'
+    | 'creator'
+    | 'recipe-manager' // 2. THÊM TYPE NÀY ĐỂ KHÔNG BỊ LỖI ĐỎ
+    | 'restaurants'
+    | 'restaurant-detail'
+    | 'food-tracking'
+    | 'community'
+    | 'marketplace'
+    | '404';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('auth');
@@ -58,6 +61,8 @@ export default function App() {
     if (recipeId) {
       setSelectedRecipe(recipeId);
     }
+    // Cuộn lên đầu trang mỗi khi chuyển trang
+    window.scrollTo(0, 0);
   };
 
   const handleAuthComplete = () => {
@@ -70,62 +75,68 @@ export default function App() {
 
   // Show mobile navigation for main app pages (not auth/onboarding/reels/checkout)
   const showMobileNav = [
-    'home', 
-    'recipe', 
-    'search', 
-    'planner', 
-    'profile', 
-    'cart', 
+    'home',
+    'recipe',
+    'search',
+    'planner',
+    'profile',
+    'cart',
     'tracking',
     'wallet',
     'notifications',
     'settings',
-    'creator'
+    'creator',
+    // Lưu ý: Tôi KHÔNG thêm 'recipe-manager' vào đây
+    // vì khi đăng bài ta cần không gian rộng, không nên hiện menu dưới chân trang.
   ].includes(appState);
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Phase A: Entry & Onboarding */}
-      {appState === 'auth' && <AuthPage onComplete={handleAuthComplete} onNavigate={handleNavigate} />}
-      {appState === 'onboarding' && <OnboardingPage onComplete={handleOnboardingComplete} />}
-      
-      {/* Phase B: Discovery */}
-      {appState === 'home' && <HomePage onNavigate={handleNavigate} />}
-      {appState === 'search' && <SearchPage onNavigate={handleNavigate} />}
-      {appState === 'reels' && <ReelsPage onNavigate={handleNavigate} />}
-      {appState === 'recipe' && <RecipeDetailPage onNavigate={handleNavigate} />}
-      
-      {/* Phase C: Utility & AI */}
-      {appState === 'planner' && <MealPlannerPage onNavigate={handleNavigate} />}
-      {appState === 'chat' && <ChatSupportPage onNavigate={handleNavigate} />}
-      {appState === 'community' && <CommunityPage onNavigate={handleNavigate} />}
-      
-      {/* Phase D: Commerce */}
-      {appState === 'cart' && <CartPage onNavigate={handleNavigate} />}
-      {appState === 'marketplace' && <IngredientMarketplacePage onNavigate={handleNavigate} />}
-      {appState === 'checkout-shipping' && <CheckoutShippingPage onNavigate={handleNavigate} />}
-      {appState === 'checkout-payment' && <CheckoutPaymentPage onNavigate={handleNavigate} />}
-      {appState === 'tracking' && <OrderTrackingPage onNavigate={handleNavigate} />}
-      
-      {/* Restaurant Service Module */}
-      {appState === 'restaurants' && <RestaurantListPage onNavigate={handleNavigate} />}
-      {appState === 'restaurant-detail' && <RestaurantDetailPage onNavigate={handleNavigate} />}
-      {appState === 'food-tracking' && <FoodOrderTrackingPage onNavigate={handleNavigate} />}
-      
-      {/* Phase E: User Ecosystem */}
-      {appState === 'profile' && <ProfilePage onNavigate={handleNavigate} />}
-      {appState === 'wallet' && <TasteWalletPage onNavigate={handleNavigate} />}
-      {appState === 'notifications' && <NotificationsPage onNavigate={handleNavigate} />}
-      {appState === 'settings' && <SettingsPage onNavigate={handleNavigate} />}
-      
-      {/* Phase F: Creator & System */}
-      {appState === 'creator' && <CreatorStudioPage onNavigate={handleNavigate} />}
-      {appState === '404' && <NotFoundPage onNavigate={handleNavigate} />}
+      <div className="min-h-screen bg-background">
+        {/* Phase A: Entry & Onboarding */}
+        {appState === 'auth' && <AuthPage onComplete={handleAuthComplete} onNavigate={handleNavigate} />}
+        {appState === 'onboarding' && <OnboardingPage onComplete={handleOnboardingComplete} />}
 
-      {/* Mobile Navigation */}
-      {showMobileNav && (
-        <MobileNavigation currentPage={appState} onNavigate={handleNavigate} />
-      )}
-    </div>
+        {/* Phase B: Discovery */}
+        {appState === 'home' && <HomePage onNavigate={handleNavigate} />}
+        {appState === 'search' && <SearchPage onNavigate={handleNavigate} />}
+        {appState === 'reels' && <ReelsPage onNavigate={handleNavigate} />}
+        {appState === 'recipe' && <RecipeDetailPage onNavigate={handleNavigate} />}
+
+        {/* Phase C: Utility & AI */}
+        {appState === 'planner' && <MealPlannerPage onNavigate={handleNavigate} />}
+        {appState === 'chat' && <ChatSupportPage onNavigate={handleNavigate} />}
+        {appState === 'community' && <CommunityPage onNavigate={handleNavigate} />}
+
+        {/* Phase D: Commerce */}
+        {appState === 'cart' && <CartPage onNavigate={handleNavigate} />}
+        {appState === 'marketplace' && <IngredientMarketplacePage onNavigate={handleNavigate} />}
+        {appState === 'checkout-shipping' && <CheckoutShippingPage onNavigate={handleNavigate} />}
+        {appState === 'checkout-payment' && <CheckoutPaymentPage onNavigate={handleNavigate} />}
+        {appState === 'tracking' && <OrderTrackingPage onNavigate={handleNavigate} />}
+
+        {/* Restaurant Service Module */}
+        {appState === 'restaurants' && <RestaurantListPage onNavigate={handleNavigate} />}
+        {appState === 'restaurant-detail' && <RestaurantDetailPage onNavigate={handleNavigate} />}
+        {appState === 'food-tracking' && <FoodOrderTrackingPage onNavigate={handleNavigate} />}
+
+        {/* Phase E: User Ecosystem */}
+        {appState === 'profile' && <ProfilePage onNavigate={handleNavigate} />}
+        {appState === 'wallet' && <TasteWalletPage onNavigate={handleNavigate} />}
+        {appState === 'notifications' && <NotificationsPage onNavigate={handleNavigate} />}
+        {appState === 'settings' && <SettingsPage onNavigate={handleNavigate} />}
+
+        {/* Phase F: Creator & System */}
+        {appState === 'creator' && <CreatorStudioPage onNavigate={handleNavigate} />}
+
+        {/* 3. RENDER TRANG RECIPE MANAGER TẠI ĐÂY */}
+        {appState === 'recipe-manager' && <RecipeManager />}
+
+        {appState === '404' && <NotFoundPage onNavigate={handleNavigate} />}
+
+        {/* Mobile Navigation */}
+        {showMobileNav && (
+            <MobileNavigation currentPage={appState} onNavigate={handleNavigate} />
+        )}
+      </div>
   );
 }
