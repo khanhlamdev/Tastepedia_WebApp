@@ -66,16 +66,14 @@ export function RecipeManager() {
                         <div className="flex bg-white p-1 rounded-xl border border-gray-200 shadow-sm">
                             <button
                                 onClick={() => setActiveTab('create')}
-                                className={`px-6 py-3 rounded-lg font-bold transition-all flex items-center gap-2 ${
-                                    activeTab === 'create' ? 'bg-[#FF6B35] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'
+                                className={`px-6 py-3 rounded-lg font-bold transition-all flex items-center gap-2 ${activeTab === 'create' ? 'bg-[#FF6B35] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'
                                 }`}
                             >
                                 <Plus className="w-5 h-5" /> <span>Đăng Món Mới</span>
                             </button>
                             <button
                                 onClick={() => setActiveTab('history')}
-                                className={`px-6 py-3 rounded-lg font-bold transition-all flex items-center gap-2 ${
-                                    activeTab === 'history' ? 'bg-[#FF6B35] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'
+                                className={`px-6 py-3 rounded-lg font-bold transition-all flex items-center gap-2 ${activeTab === 'history' ? 'bg-[#FF6B35] text-white shadow-lg' : 'text-gray-500 hover:bg-gray-50'
                                 }`}
                             >
                                 <Calendar className="w-5 h-5" /> <span>Lịch Sử & Phân Tích</span>
@@ -127,58 +125,162 @@ function StatCard({ color, title, value, sub, icon: Icon }: any) {
 function EnhancedCreateRecipeForm() {
     // 1. STATES
 
-    // Ảnh chính
-    const [mainImage, setMainImage] = useState<string | null>(null);
+    // --- Form Text Fields ---
+    const [title, setTitle] = useState('');
+    const [description, setDescription] = useState('');
+    const [cookTime, setCookTime] = useState('');
+    const [servings, setServings] = useState('');
+
+    // --- Ảnh chính (Lưu cả File và Preview URL) ---
+    const [mainImageFile, setMainImageFile] = useState<File | null>(null);
+    const [mainImagePreview, setMainImagePreview] = useState<string | null>(null);
     const mainInputRef = useRef<HTMLInputElement>(null);
 
-    // Ảnh phụ
-    const [subImages, setSubImages] = useState<string[]>([]);
+    // --- Ảnh phụ (Lưu cả File[] và Preview URLs[]) ---
+    const [subImageFiles, setSubImageFiles] = useState<File[]>([]);
+    const [subImagePreviews, setSubImagePreviews] = useState<string[]>([]);
     const subInputRef = useRef<HTMLInputElement>(null);
 
-    // Nguyên liệu (Tự nhập)
+    // --- Nguyên liệu (Tự nhập) ---
     const [ingredients, setIngredients] = useState([
         { id: 1, name: '', quantity: '', unit: '', price: '' }
     ]);
 
-    // Các bước làm
+    // --- Các bước làm ---
     const [steps, setSteps] = useState([{ id: Date.now(), content: '' }]);
 
-    // Khác
-    const [recipeLevel, setRecipeLevel] = useState(3);
+    // --- Khác ---
+    const [recipeLevel, setRecipeLevel] = useState(1); // 1 = Dễ, 2 = Vừa, 3 = Khó
     const [isPremium, setIsPremium] = useState(false);
     const [visibility, setVisibility] = useState('public');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // 2. HANDLERS
 
-    // Ảnh chính
+    // --- Ảnh chính ---
     const handleMainImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file) setMainImage(URL.createObjectURL(file));
+        if (file) {
+            setMainImageFile(file);
+            setMainImagePreview(URL.createObjectURL(file));
+        }
     };
 
-    // Ảnh phụ
+    // --- Ảnh phụ ---
     const handleSubImageUpload = (e: ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];
-        if (file && subImages.length < 3) {
-            setSubImages([...subImages, URL.createObjectURL(file)]);
+        if (file && subImageFiles.length < 3) {
+            setSubImageFiles([...subImageFiles, file]);
+            setSubImagePreviews([...subImagePreviews, URL.createObjectURL(file)]);
         }
         if (e.target) e.target.value = '';
     };
 
     const removeSubImage = (index: number) => {
-        setSubImages(subImages.filter((_, i) => i !== index));
+        setSubImageFiles(subImageFiles.filter((_, i) => i !== index));
+        setSubImagePreviews(subImagePreviews.filter((_, i) => i !== index));
     };
 
-    // Nguyên liệu
+    // --- Nguyên liệu ---
     const handleIngredientChange = (id: number, field: string, value: string) => {
         setIngredients(ingredients.map(item => item.id === id ? { ...item, [field]: value } : item));
     };
     const addIngredientRow = () => setIngredients([...ingredients, { id: Date.now(), name: '', quantity: '', unit: '', price: '' }]);
     const removeIngredientRow = (id: number) => ingredients.length > 1 && setIngredients(ingredients.filter(item => item.id !== id));
 
-    // Tính toán
+    // --- Tính toán ---
     const totalCost = ingredients.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0);
     const commission = totalCost * 0.15;
+
+    // 3. SUBMIT HANDLER
+    const handleSubmit = async () => {
+        // Validation
+        if (!title.trim()) {
+            alert('⚠️ Vui lòng nhập tên món ăn!');
+            return;
+        }
+        if (!mainImageFile) {
+            alert('⚠️ Vui lòng tải ảnh chính!');
+            return;
+        }
+
+        setIsSubmitting(true);
+
+        try {
+            // --- BƯỚC 1: TẠO FORMDATA ---
+            const formData = new FormData();
+
+            // 1.1 - Tạo Object JSON (không có file)
+            const recipeData = {
+                title,
+                description,
+                cookTime: parseInt(cookTime) || 0,
+                servings: parseInt(servings) || 0,
+                difficulty: ['Dễ', 'Vừa', 'Khó'][recipeLevel - 1],
+                ingredients: ingredients.map(ing => ({
+                    name: ing.name,
+                    quantity: ing.quantity,
+                    unit: ing.unit,
+                    price: parseFloat(ing.price) || 0
+                })),
+                steps: steps.map((step, idx) => ({
+                    stepNumber: idx + 1,
+                    content: step.content
+                })),
+                totalCost,
+                estimatedCommission: commission,
+                // --- SỬA CHỖ NÀY: Đổi 'isPremium' thành 'premium' ---
+                premium: isPremium,
+                visibility
+            };
+
+            // 1.2 - Append JSON vào FormData dưới dạng String
+            formData.append('data', JSON.stringify(recipeData));
+
+            // 1.3 - Append ảnh chính
+            formData.append('mainImage', mainImageFile);
+
+            // 1.4 - Append ảnh phụ (nếu có)
+            subImageFiles.forEach((file) => {
+                formData.append('subImages', file);
+            });
+
+            // --- BƯỚC 2: GỬI REQUEST ---
+            const response = await fetch('http://localhost:8080/api/recipes/create', {
+                method: 'POST',
+                credentials: 'include', // Gửi kèm session cookie
+                body: formData
+            });
+
+            // --- BƯỚC 3: XỬ LÝ RESPONSE ---
+            if (response.ok) {
+                const savedRecipe = await response.json();
+                console.log('✅ Đăng công thức thành công:', savedRecipe);
+                alert('✅ Đăng công thức thành công!');
+
+                // Reset form
+                setTitle('');
+                setDescription('');
+                setCookTime('');
+                setServings('');
+                setMainImageFile(null);
+                setMainImagePreview(null);
+                setSubImageFiles([]);
+                setSubImagePreviews([]);
+                setIngredients([{ id: 1, name: '', quantity: '', unit: '', price: '' }]);
+                setSteps([{ id: Date.now(), content: '' }]);
+            } else {
+                const errorText = await response.text();
+                console.error('❌ Lỗi từ server:', errorText);
+                alert('❌ Lỗi: ' + errorText);
+            }
+        } catch (error) {
+            console.error('❌ Lỗi kết nối:', error);
+            alert('❌ Không thể kết nối tới server. Vui lòng kiểm tra lại!');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
@@ -196,15 +298,15 @@ function EnhancedCreateRecipeForm() {
                         <div className="space-y-4">
                             <div>
                                 <Label className="text-base font-semibold">Tên món ăn <Badge variant="outline" className="text-xs ml-2">Bắt buộc</Badge></Label>
-                                <Input placeholder="Ví dụ: Bún Chả Hà Nội..." className="text-lg h-12 border-orange-200 focus:border-orange-400" />
+                                <Input placeholder="Ví dụ: Bún Chả Hà Nội..." value={title} onChange={(e) => setTitle(e.target.value)} className="text-lg h-12 border-orange-200 focus:border-orange-400" />
                             </div>
                             <div>
                                 <Label className="text-base font-semibold">Mô tả hấp dẫn</Label>
-                                <Textarea placeholder="Mô tả hương vị, điểm đặc biệt..." className="min-h-[100px] border-orange-200 focus:border-orange-400" />
+                                <Textarea placeholder="Mô tả hương vị, điểm đặc biệt..." value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-[100px] border-orange-200 focus:border-orange-400" />
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div><Label>Thời gian</Label><Input placeholder="30 phút" className="border-orange-200" /></div>
-                                <div><Label>Khẩu phần</Label><Input placeholder="2 người" className="border-orange-200" /></div>
+                                <div><Label>Thời gian (phút)</Label><Input type="number" placeholder="30" value={cookTime} onChange={(e) => setCookTime(e.target.value)} className="border-orange-200" /></div>
+                                <div><Label>Khẩu phần</Label><Input type="number" placeholder="2" value={servings} onChange={(e) => setServings(e.target.value)} className="border-orange-200" /></div>
                                 <div>
                                     <Label>Độ khó</Label>
                                     <div className="flex gap-2 pt-2 w-full">
@@ -225,7 +327,7 @@ function EnhancedCreateRecipeForm() {
                         <Separator />
 
                         <div className="space-y-4">
-                            <Label className="flex items-center gap-2"><FileText className="w-5 h-5"/> Hướng dẫn chi tiết</Label>
+                            <Label className="flex items-center gap-2"><FileText className="w-5 h-5" /> Hướng dẫn chi tiết</Label>
                             {steps.map((step, index) => (
                                 <div key={step.id} className="flex gap-3 p-4 bg-gray-50 rounded-xl group relative hover:bg-orange-50/50 transition-colors">
                                     <div className="flex-shrink-0 w-8 h-8 bg-[#FF6B35] text-white rounded-full flex items-center justify-center font-bold">{index + 1}</div>
@@ -240,13 +342,13 @@ function EnhancedCreateRecipeForm() {
                                         className="flex-1 border-0 bg-transparent focus-visible:ring-0 resize-none min-h-[60px]"
                                     />
                                     {steps.length > 1 && (
-                                        <button onClick={() => setSteps(steps.filter((_, i) => i !== index))} className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-white"><Trash2 className="w-5 h-5"/></button>
+                                        <button onClick={() => setSteps(steps.filter((_, i) => i !== index))} className="text-gray-400 hover:text-red-500 p-2 rounded-full hover:bg-white"><Trash2 className="w-5 h-5" /></button>
                                     )}
                                 </div>
                             ))}
                             {steps.length < 20 ? (
                                 <Button variant="outline" onClick={() => setSteps([...steps, { id: Date.now(), content: '' }])} className="w-full border-dashed text-[#FF6B35] border-orange-200 hover:bg-orange-50 h-12">
-                                    <Plus className="w-4 h-4 mr-2"/> Thêm bước mới ({steps.length}/20)
+                                    <Plus className="w-4 h-4 mr-2" /> Thêm bước mới ({steps.length}/20)
                                 </Button>
                             ) : (
                                 <p className="text-center text-sm text-red-500 font-medium py-2">Đã đạt giới hạn tối đa 20 bước</p>
@@ -257,23 +359,23 @@ function EnhancedCreateRecipeForm() {
 
                 {/* --- MEDIA UPLOAD --- */}
                 <Card className="border-0 shadow-lg">
-                    <CardHeader><CardTitle className="flex gap-2"><ImageIcon className="text-orange-600"/> Hình ảnh & Video</CardTitle></CardHeader>
+                    <CardHeader><CardTitle className="flex gap-2"><ImageIcon className="text-orange-600" /> Hình ảnh & Video</CardTitle></CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-2 gap-4">
                             {/* ẢNH CHÍNH */}
                             <div
-                                className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group overflow-hidden ${mainImage ? 'border-orange-500 bg-orange-50 p-0' : 'border-orange-200 hover:bg-orange-50'}`}
-                                onClick={() => !mainImage && mainInputRef.current?.click()}
+                                className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group overflow-hidden ${mainImagePreview ? 'border-orange-500 bg-orange-50 p-0' : 'border-orange-200 hover:bg-orange-50'}`}
+                                onClick={() => !mainImagePreview && mainInputRef.current?.click()}
                             >
-                                {mainImage ? (
+                                {mainImagePreview ? (
                                     <>
-                                        <img src={mainImage} className="w-full h-64 object-cover" />
-                                        <button onClick={(e) => { e.stopPropagation(); setMainImage(null); }} className="absolute top-2 right-2 bg-white/80 p-2 rounded-full text-red-500 hover:bg-white shadow-sm z-10"><Trash2 className="w-5 h-5"/></button>
+                                        <img src={mainImagePreview} className="w-full h-64 object-cover" />
+                                        <button onClick={(e) => { e.stopPropagation(); setMainImageFile(null); setMainImagePreview(null); }} className="absolute top-2 right-2 bg-white/80 p-2 rounded-full text-red-500 hover:bg-white shadow-sm z-10"><Trash2 className="w-5 h-5" /></button>
                                         <div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs py-1">Ảnh bìa</div>
                                     </>
                                 ) : (
                                     <>
-                                        <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3"><Upload className="w-8 h-8"/></div>
+                                        <div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3"><Upload className="w-8 h-8" /></div>
                                         <p className="font-bold text-gray-700">Tải ảnh chính</p>
                                         <p className="text-xs text-orange-500 mt-1">(Bắt buộc tải ảnh chính trước)</p>
                                     </>
@@ -283,7 +385,7 @@ function EnhancedCreateRecipeForm() {
 
                             {/* VIDEO */}
                             <div className="border-2 border-dashed border-blue-200 rounded-xl p-8 text-center hover:bg-blue-50 cursor-pointer flex flex-col justify-center">
-                                <div className="w-16 h-16 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-3"><Video className="w-8 h-8"/></div>
+                                <div className="w-16 h-16 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-3"><Video className="w-8 h-8" /></div>
                                 <p className="font-bold text-gray-700">Thêm Video</p>
                             </div>
                         </div>
@@ -292,14 +394,14 @@ function EnhancedCreateRecipeForm() {
                         <div className="mt-6">
                             <div className="flex justify-between items-center mb-3">
                                 <Label className="text-base font-semibold">Thư viện ảnh phụ</Label>
-                                <span className="text-xs text-gray-500">{subImages.length}/3 ảnh</span>
+                                <span className="text-xs text-gray-500">{subImagePreviews.length}/3 ảnh</span>
                             </div>
 
                             <input type="file" ref={subInputRef} className="hidden" accept="image/*" onChange={handleSubImageUpload} />
 
                             <div className="grid grid-cols-4 gap-3">
                                 {[0, 1, 2, 3].map((index) => {
-                                    const img = subImages[index];
+                                    const img = subImagePreviews[index];
 
                                     // 1. Nếu có ảnh -> Hiển thị ảnh + Nút Xóa (GIỐNG ẢNH CHÍNH)
                                     if (img) return (
@@ -329,8 +431,8 @@ function EnhancedCreateRecipeForm() {
                                     );
 
                                     // 2. Nếu là ô tiếp theo -> Check điều kiện Ảnh chính
-                                    if (index === subImages.length && subImages.length < 3) {
-                                        if (!mainImage) {
+                                    if (index === subImagePreviews.length && subImagePreviews.length < 3) {
+                                        if (!mainImagePreview) {
                                             return (
                                                 <div key={index} className="aspect-square border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center bg-gray-50 text-gray-400 cursor-not-allowed">
                                                     <Lock className="w-6 h-6 mb-1 opacity-50" />
@@ -368,7 +470,7 @@ function EnhancedCreateRecipeForm() {
                 <Card className="border-0 shadow-lg" style={{ backgroundColor: '#FFF7ED' }}>
                     <CardHeader>
                         <CardTitle className="flex justify-between items-center">
-                            <span className="flex gap-2 text-orange-700"><Package className="text-orange-600"/> Nguyên liệu</span>
+                            <span className="flex gap-2 text-orange-700"><Package className="text-orange-600" /> Nguyên liệu</span>
                             <Badge className="text-white border-0 text-lg px-3 py-1" style={{ backgroundColor: '#FF6B35' }}>${totalCost.toFixed(2)}</Badge>
                         </CardTitle>
                         <CardDescription className="text-orange-800/70">Nhập danh sách nguyên liệu cần thiết</CardDescription>
@@ -390,7 +492,7 @@ function EnhancedCreateRecipeForm() {
                                     <Input placeholder="1" type="number" className="w-16 bg-white border-orange-200 h-9 text-sm text-center" value={item.quantity} onChange={(e) => handleIngredientChange(item.id, 'quantity', e.target.value)} />
                                     <Input placeholder="kg" className="w-16 bg-white border-orange-200 h-9 text-sm text-center" value={item.unit} onChange={(e) => handleIngredientChange(item.id, 'unit', e.target.value)} />
                                     <Input placeholder="0" type="number" className="w-16 bg-white border-orange-200 h-9 text-sm text-right font-bold text-orange-600" value={item.price} onChange={(e) => handleIngredientChange(item.id, 'price', e.target.value)} />
-                                    <button onClick={() => removeIngredientRow(item.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4"/></button>
+                                    <button onClick={() => removeIngredientRow(item.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                                 </div>
                             ))}
                         </div>
@@ -407,7 +509,7 @@ function EnhancedCreateRecipeForm() {
 
                     <CardFooter className="flex flex-col gap-4">
                         <div className="flex justify-between w-full items-center">
-                            <Label className="flex gap-2 cursor-pointer text-orange-900"><Zap className="text-amber-500"/> Chế độ Premium</Label>
+                            <Label className="flex gap-2 cursor-pointer text-orange-900"><Zap className="text-amber-500" /> Chế độ Premium</Label>
                             <Switch checked={isPremium} onCheckedChange={setIsPremium} />
                         </div>
                         <div className="w-full space-y-2">
@@ -425,8 +527,13 @@ function EnhancedCreateRecipeForm() {
                                 ))}
                             </div>
                         </div>
-                        <Button className="w-full h-12 text-lg font-bold text-white shadow-lg" style={{ backgroundColor: '#FF6B35' }}>
-                            <Upload className="w-5 h-5 mr-2" /> Đăng Công Thức
+                        <Button
+                            onClick={handleSubmit}
+                            disabled={isSubmitting}
+                            className="w-full h-12 text-lg font-bold text-white shadow-lg"
+                            style={{ backgroundColor: isSubmitting ? '#ccc' : '#FF6B35' }}
+                        >
+                            <Upload className="w-5 h-5 mr-2" /> {isSubmitting ? 'Đang đăng...' : 'Đăng Công Thức'}
                         </Button>
                     </CardFooter>
                 </Card>
@@ -440,7 +547,7 @@ function EnhancedRecipeHistoryList() {
     return (
         <Card className="border-0 shadow-lg overflow-hidden rounded-2xl">
             <div className="bg-gradient-to-r from-gray-800 to-gray-900 p-6 text-white flex justify-between items-center">
-                <h3 className="text-xl font-bold flex items-center gap-2"><Calendar className="w-5 h-5"/> Lịch sử bài đăng</h3>
+                <h3 className="text-xl font-bold flex items-center gap-2"><Calendar className="w-5 h-5" /> Lịch sử bài đăng</h3>
                 <div className="flex gap-2">
                     <Button size="sm" variant="secondary" className="bg-gray-700 text-white hover:bg-gray-600 border-0">Tất cả</Button>
                     <Button size="sm" variant="ghost" className="text-gray-400 hover:text-white">Đã duyệt</Button>
@@ -477,7 +584,7 @@ function EnhancedRecipeHistoryList() {
                                 )}
                             </td>
                             <td className="py-4 px-6 text-right font-bold text-green-600 text-lg">${item.revenue.toFixed(2)}</td>
-                            <td className="py-4 px-6 text-right"><Button variant="ghost" size="icon" className="text-gray-400 hover:text-[#FF6B35]"><MoreHorizontal className="w-5 h-5"/></Button></td>
+                            <td className="py-4 px-6 text-right"><Button variant="ghost" size="icon" className="text-gray-400 hover:text-[#FF6B35]"><MoreHorizontal className="w-5 h-5" /></Button></td>
                         </tr>
                     ))}
                     </tbody>

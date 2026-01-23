@@ -7,8 +7,11 @@ import com.tastepedia.backend.payload.SignupRequest;
 import com.tastepedia.backend.payload.VerifyRequest;
 import com.tastepedia.backend.repository.UserRepository;
 import com.tastepedia.backend.service.EmailService;
+import jakarta.servlet.http.Cookie;
+import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession; // Import Session
 import org.springframework.beans.factory.annotation.Autowired;
+
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.web.bind.annotation.*;
@@ -123,9 +126,20 @@ public class AuthController {
 
     // --- 5. API ĐĂNG XUẤT (HỦY SESSION) ---
     @PostMapping("/logout")
-    public ResponseEntity<?> logout(HttpSession session) {
+    public ResponseEntity<?> logout(HttpSession session, HttpServletResponse response) {
+        // 1. Hủy session trên server (Dữ liệu phiên làm việc bị xóa)
         session.invalidate();
-        return ResponseEntity.ok("Đăng xuất thành công!");
+
+        // 2. Tạo một Cookie "chết" để gửi về Client
+        Cookie cookie = new Cookie("JSESSIONID", null);
+        cookie.setPath("/"); // Đường dẫn phải trùng với cookie gốc
+        cookie.setHttpOnly(true);
+        cookie.setMaxAge(0); // QUAN TRỌNG: 0 nghĩa là xóa ngay lập tức
+
+        // 3. Gắn cookie này vào phản hồi
+        response.addCookie(cookie);
+
+        return ResponseEntity.ok("Đăng xuất thành công và đã xóa Cookie!");
     }
 
     // --- 6. API XÁC THỰC OTP ---

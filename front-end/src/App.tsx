@@ -27,30 +27,32 @@ import { MobileNavigation } from './components/MobileNavigation';
 import { RecipeManager } from './components/RecipeManager';
 
 type AppState =
-    | 'auth'
-    | 'onboarding'
-    | 'home'
-    | 'search'
-    | 'recipe'
-    | 'reels'
-    | 'planner'
-    | 'chat'
-    | 'cart'
-    | 'checkout-shipping'
-    | 'checkout-payment'
-    | 'tracking'
-    | 'profile'
-    | 'wallet'
-    | 'notifications'
-    | 'settings'
-    | 'creator'
-    | 'recipe-manager'
-    | 'restaurants'
-    | 'restaurant-detail'
-    | 'food-tracking'
-    | 'community'
-    | 'marketplace'
-    | '404';
+  | 'auth'
+  | 'login'
+  | 'signup'
+  | 'onboarding'
+  | 'home'
+  | 'search'
+  | 'recipe'
+  | 'reels'
+  | 'planner'
+  | 'chat'
+  | 'cart'
+  | 'checkout-shipping'
+  | 'checkout-payment'
+  | 'tracking'
+  | 'profile'
+  | 'wallet'
+  | 'notifications'
+  | 'settings'
+  | 'creator'
+  | 'recipe-manager'
+  | 'restaurants'
+  | 'restaurant-detail'
+  | 'food-tracking'
+  | 'community'
+  | 'marketplace'
+  | '404';
 
 export default function App() {
   const [appState, setAppState] = useState<AppState>('auth');
@@ -66,14 +68,17 @@ export default function App() {
     const checkLoginStatus = async () => {
       try {
         // [QUAN TRỌNG] Thêm { withCredentials: true } để gửi Cookie JSESSIONID lên Server
-        await axios.get(`${API_URL}/me`, { withCredentials: true });
+        const res = await axios.get(`${API_URL}/me`, { withCredentials: true });
 
         // Nếu Server bảo OK (200) -> Giữ ở trang Home
+        // Sync localStorage để Header hiển thị đúng
+        localStorage.setItem('user', JSON.stringify(res.data));
         setAppState('home');
       } catch (error) {
-        // Nếu Server bảo Lỗi (401) hoặc ko có mạng -> Về trang Login
-        console.log("Phiên đăng nhập hết hạn hoặc chưa đăng nhập.");
-        setAppState('auth');
+        // Nếu không có session -> Cho phép vào Home ở chế độ Guest (khách)
+        // Header sẽ hiển thị nút Login/Signup
+        console.log("Chưa đăng nhập, vào chế độ khách.");
+        setAppState('home');
       } finally {
         // Tắt loading dù thành công hay thất bại
         setIsLoadingSession(false);
@@ -116,45 +121,47 @@ export default function App() {
   // Màn hình chờ khi đang check session
   if (isLoadingSession) {
     return (
-        <div className="min-h-screen flex items-center justify-center bg-white">
-          <div className="flex flex-col items-center gap-4">
-            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35]"></div>
-            <p className="text-gray-500 text-sm">Đang tải dữ liệu...</p>
-          </div>
+      <div className="min-h-screen flex items-center justify-center bg-white">
+        <div className="flex flex-col items-center gap-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35]"></div>
+          <p className="text-gray-500 text-sm">Đang tải dữ liệu...</p>
         </div>
+      </div>
     );
   }
 
   return (
-      <div className="min-h-screen bg-background">
-        {appState === 'auth' && <AuthPage onComplete={handleAuthComplete} onNavigate={handleNavigate} />}
-        {appState === 'onboarding' && <OnboardingPage onComplete={handleOnboardingComplete} />}
-        {appState === 'home' && <HomePage onNavigate={handleNavigate} />}
-        {appState === 'search' && <SearchPage onNavigate={handleNavigate} />}
-        {appState === 'reels' && <ReelsPage onNavigate={handleNavigate} />}
-        {appState === 'recipe' && <RecipeDetailPage onNavigate={handleNavigate} />}
-        {appState === 'planner' && <MealPlannerPage onNavigate={handleNavigate} />}
-        {appState === 'chat' && <ChatSupportPage onNavigate={handleNavigate} />}
-        {appState === 'community' && <CommunityPage onNavigate={handleNavigate} />}
-        {appState === 'cart' && <CartPage onNavigate={handleNavigate} />}
-        {appState === 'marketplace' && <IngredientMarketplacePage onNavigate={handleNavigate} />}
-        {appState === 'checkout-shipping' && <CheckoutShippingPage onNavigate={handleNavigate} />}
-        {appState === 'checkout-payment' && <CheckoutPaymentPage onNavigate={handleNavigate} />}
-        {appState === 'tracking' && <OrderTrackingPage onNavigate={handleNavigate} />}
-        {appState === 'restaurants' && <RestaurantListPage onNavigate={handleNavigate} />}
-        {appState === 'restaurant-detail' && <RestaurantDetailPage onNavigate={handleNavigate} />}
-        {appState === 'food-tracking' && <FoodOrderTrackingPage onNavigate={handleNavigate} />}
-        {appState === 'profile' && <ProfilePage onNavigate={handleNavigate} />}
-        {appState === 'wallet' && <TasteWalletPage onNavigate={handleNavigate} />}
-        {appState === 'notifications' && <NotificationsPage onNavigate={handleNavigate} />}
-        {appState === 'settings' && <SettingsPage onNavigate={handleNavigate} />}
-        {appState === 'creator' && <CreatorStudioPage onNavigate={handleNavigate} />}
-        {appState === 'recipe-manager' && <RecipeManager />}
-        {appState === '404' && <NotFoundPage onNavigate={handleNavigate} />}
+    <div className="min-h-screen bg-background">
+      {appState === 'auth' && <AuthPage onComplete={handleAuthComplete} onNavigate={handleNavigate} />}
+      {appState === 'login' && <AuthPage initialView="login" onComplete={handleAuthComplete} onNavigate={handleNavigate} />}
+      {appState === 'signup' && <AuthPage initialView="signup" onComplete={handleAuthComplete} onNavigate={handleNavigate} />}
+      {appState === 'onboarding' && <OnboardingPage onComplete={handleOnboardingComplete} />}
+      {appState === 'home' && <HomePage onNavigate={handleNavigate} />}
+      {appState === 'search' && <SearchPage onNavigate={handleNavigate} />}
+      {appState === 'reels' && <ReelsPage onNavigate={handleNavigate} />}
+      {appState === 'recipe' && <RecipeDetailPage onNavigate={handleNavigate} />}
+      {appState === 'planner' && <MealPlannerPage onNavigate={handleNavigate} />}
+      {appState === 'chat' && <ChatSupportPage onNavigate={handleNavigate} />}
+      {appState === 'community' && <CommunityPage onNavigate={handleNavigate} />}
+      {appState === 'cart' && <CartPage onNavigate={handleNavigate} />}
+      {appState === 'marketplace' && <IngredientMarketplacePage onNavigate={handleNavigate} />}
+      {appState === 'checkout-shipping' && <CheckoutShippingPage onNavigate={handleNavigate} />}
+      {appState === 'checkout-payment' && <CheckoutPaymentPage onNavigate={handleNavigate} />}
+      {appState === 'tracking' && <OrderTrackingPage onNavigate={handleNavigate} />}
+      {appState === 'restaurants' && <RestaurantListPage onNavigate={handleNavigate} />}
+      {appState === 'restaurant-detail' && <RestaurantDetailPage onNavigate={handleNavigate} />}
+      {appState === 'food-tracking' && <FoodOrderTrackingPage onNavigate={handleNavigate} />}
+      {appState === 'profile' && <ProfilePage onNavigate={handleNavigate} />}
+      {appState === 'wallet' && <TasteWalletPage onNavigate={handleNavigate} />}
+      {appState === 'notifications' && <NotificationsPage onNavigate={handleNavigate} />}
+      {appState === 'settings' && <SettingsPage onNavigate={handleNavigate} />}
+      {appState === 'creator' && <CreatorStudioPage onNavigate={handleNavigate} />}
+      {appState === 'recipe-manager' && <RecipeManager />}
+      {appState === '404' && <NotFoundPage onNavigate={handleNavigate} />}
 
-        {showMobileNav && (
-            <MobileNavigation currentPage={appState} onNavigate={handleNavigate} />
-        )}
-      </div>
+      {showMobileNav && (
+        <MobileNavigation currentPage={appState} onNavigate={handleNavigate} />
+      )}
+    </div>
   );
 }
