@@ -7,9 +7,22 @@ import { Separator } from './ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Avatar } from './ui/avatar';
 import { Card } from './ui/card';
+import { Textarea } from './ui/textarea';
+import { useEffect } from 'react';
 
 interface RecipeDetailPageProps {
   onNavigate: (page: string) => void;
+}
+
+interface ReviewData {
+  id: string;
+  username: string;
+  avatar: string;
+  rating: number;
+  createdAt: string;
+  comment: string;
+  helpfulCount: number;
+  isVerified: boolean;
 }
 
 export function RecipeDetailPage({ onNavigate }: RecipeDetailPageProps) {
@@ -83,65 +96,81 @@ export function RecipeDetailPage({ onNavigate }: RecipeDetailPageProps) {
     },
   ];
 
-  // Mock data for reviews
-  const reviews = [
-    {
-      id: 1,
-      author: 'Sarah M.',
-      avatar: 'SM',
-      rating: 5,
-      date: '2 days ago',
-      comment: 'This is the BEST Bún Chả recipe I\'ve ever tried! The balance of flavors is perfect. My family loved it!',
-      helpful: 42,
-      verified: true
-    },
-    {
-      id: 2,
-      author: 'David Chen',
-      avatar: 'DC',
-      rating: 4,
-      date: '1 week ago',
-      comment: 'Great recipe! I substituted chicken for pork and it still turned out amazing. The dipping sauce is incredible.',
-      helpful: 28,
-      verified: false
-    },
-    {
-      id: 3,
-      author: 'Emily R.',
-      avatar: 'ER',
-      rating: 5,
-      date: '2 weeks ago',
-      comment: 'Authentic taste! I lived in Hanoi for 2 years and this tastes just like what I had there. Highly recommend!',
-      helpful: 56,
-      verified: true
-    },
-    {
-      id: 4,
-      author: 'Mike Johnson',
-      avatar: 'MJ',
-      rating: 4,
-      date: '3 weeks ago',
-      comment: 'Easy to follow instructions. Took me about an hour total. The charred pork is key!',
-      helpful: 19,
-      verified: false
-    },
-    {
-      id: 5,
-      author: 'Lisa Wong',
-      avatar: 'LW',
-      rating: 5,
-      date: '1 month ago',
-      comment: 'Made this for a dinner party and everyone asked for the recipe! Will definitely make again.',
-      helpful: 34,
-      verified: true
-    },
-  ];
+  const [reviews, setReviews] = useState<ReviewData[]>([]);
+  const [newComment, setNewComment] = useState('');
+  const [newRating, setNewRating] = useState(5);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Giả sử ID món ăn hiện tại là 'bun-cha-ha-noi' (sau này lấy từ URL params)
+  const currentRecipeId = 'bun-cha-ha-noi';
 
   const toggleIngredient = (id: string) => {
     setSelectedIngredients(prev =>
       prev.includes(id) ? prev.filter(i => i !== id) : [...prev, id]
     );
   };
+
+  useEffect(() => {
+      fetch(`http://localhost:8080/api/reviews/${currentRecipeId}`)
+        .then(res => res.json())
+        .then(data => setReviews(data))
+        .catch(err => console.error("Error fetching reviews:", err));
+    }, []);
+
+  const handleSubmitReview = async () => {
+      if (!newComment.trim()) return;
+
+      setIsSubmitting(true);
+      const savedUserStr = localStorage.getItem('user');
+      let currentUser = {
+             _id: "697026a611b1058843f2e32d", // Fallback ID của bạn (nếu chưa lưu storage)
+             fullName: "Nguyễn Đức Tài",
+             avatar: "T" // Lấy chữ cái đầu tên
+          };
+      if (savedUserStr) {
+              try {
+                  const parsed = JSON.parse(savedUserStr);
+                  // Cập nhật nếu parse thành công
+                  currentUser._id = parsed._id || parsed.id || currentUser._id;
+                  currentUser.fullName = parsed.fullName || currentUser.fullName;
+                  // Tạo avatar từ tên: "Nguyễn Đức Tài" -> "T" hoặc "NT"
+                  const nameParts = currentUser.fullName.split(' ');
+                  const lastInitial = nameParts[nameParts.length - 1]?.charAt(0).toUpperCase() || "U";
+                  currentUser.avatar = lastInitial;
+              } catch (e) {
+                  console.log("Không đọc được user từ storage, dùng mặc định.");
+              }
+          }
+
+      const reviewPayload = {
+            recipeId: currentRecipeId,
+            userId: currentUser._id,      // Dùng ID thật: 697026a611b1058843f2e32d
+            username: currentUser.fullName, // Dùng tên thật: Nguyễn Đức Tài
+            avatar: currentUser.avatar,     // Avatar tự tạo: "T"
+            rating: newRating,
+            comment: newComment,
+            isVerified: true // Hoặc check logic: currentUser.role === 'VERIFIED_COOK'
+          };
+
+      try {
+        const response = await fetch('http://localhost:8080/api/reviews/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(reviewPayload)
+        });
+
+        if (response.ok) {
+          const savedReview = await response.json();
+          setReviews([savedReview, ...reviews]); // Thêm review mới lên đầu danh sách
+          setNewComment(''); // Reset ô nhập
+          setNewRating(5);
+        }
+      } catch (error) {
+        console.error("Error posting review:", error);
+      } finally {
+        setIsSubmitting(false);
+      }
+    };
 
   const totalPrice = ingredients
     .filter(i => selectedIngredients.includes(i.id) && !i.inPantry)
@@ -316,8 +345,35 @@ export function RecipeDetailPage({ onNavigate }: RecipeDetailPageProps) {
 
             {/* Reviews Section with ref for scrolling */}
             <div className="bg-white md:rounded-3xl p-4 md:p-6 mb-4 md:mb-6" ref={reviewsRef} id="reviews-section">
-              <h2 className="text-2xl font-bold mb-6">Reviews ({totalReviews})</h2>
-              
+              <h2 className="text-2xl font-bold mb-6">Reviews ({reviews.length})</h2>
+
+              <div className="mb-8 p-4 bg-orange-50 rounded-2xl border border-orange-100">
+                <h3 className="font-semibold mb-3">Leave a Review</h3>
+                <div className="flex gap-2 mb-3">
+                  {[1, 2, 3, 4, 5].map((star) => (
+                    <button key={star} onClick={() => setNewRating(star)} type="button">
+                      <Star
+                        className={`w-6 h-6 ${star <= newRating ? 'fill-[#FFB800] text-[#FFB800]' : 'text-gray-300'}`}
+                      />
+                    </button>
+                  ))}
+                </div>
+                <Textarea
+                  placeholder="Share your thoughts about this dish..."
+                  className="bg-white mb-3"
+                  value={newComment}
+                  onChange={(e) => setNewComment(e.target.value)}
+                />
+                <div className="flex justify-end">
+                  <Button
+                    onClick={handleSubmitReview}
+                    disabled={isSubmitting}
+                    className="bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-full"
+                  >
+                    {isSubmitting ? 'Posting...' : 'Post Review'}
+                  </Button>
+                </div>
+              </div>
               {/* Rating Summary */}
               <div className="flex items-center gap-6 mb-6 p-4 bg-[#F9F9F9] rounded-2xl">
                 <div className="text-center">
@@ -362,8 +418,8 @@ export function RecipeDetailPage({ onNavigate }: RecipeDetailPageProps) {
                       </Avatar>
                       <div className="flex-1">
                         <div className="flex items-center gap-2 mb-1">
-                          <span className="font-semibold">{review.author}</span>
-                          {review.verified && (
+                          <span className="font-semibold">{review.username}</span>
+                          {review.isVerified && (
                             <Badge className="bg-[#4CAF50] text-white text-xs">
                               <CheckCircle2 className="w-3 h-3 mr-1" />
                               Verified Cook
@@ -379,13 +435,13 @@ export function RecipeDetailPage({ onNavigate }: RecipeDetailPageProps) {
                               />
                             ))}
                           </div>
-                          <span className="text-sm text-gray-500">{review.date}</span>
+                          <span className="text-sm text-gray-500">{new Date(review.createdAt).toLocaleDateString()}</span>
                         </div>
                         <p className="text-gray-700 mb-3">{review.comment}</p>
                         <div className="flex items-center gap-4">
                           <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-[#4CAF50] transition-colors">
                             <ThumbsUp className="w-4 h-4" />
-                            <span>Helpful ({review.helpful})</span>
+                            <span>Helpful ({review.helpfulCount})</span>
                           </button>
                           <button className="flex items-center gap-1 text-sm text-gray-500 hover:text-gray-700 transition-colors">
                             <MessageCircle className="w-4 h-4" />
