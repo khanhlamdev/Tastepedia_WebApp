@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import {
   ArrowLeft, Heart, MessageCircle, Share2, MoreHorizontal, TrendingUp, Award, Search,
-  Plus, Camera, Video, UtensilsCrossed, HelpCircle, Lightbulb, FileText, Send, Flag, Trash2, Edit, X, Loader2, Image as ImageIcon
+  Plus, Camera, Video, UtensilsCrossed, HelpCircle, Lightbulb, FileText, Send, Flag, Trash2, Edit, X, Loader2, Image as ImageIcon, Check
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -9,7 +9,6 @@ import { Avatar } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
 import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
-import { ScrollArea } from './ui/scroll-area';
 import { Progress } from './ui/progress';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Label } from './ui/label';
@@ -80,6 +79,7 @@ interface PostData {
 export function CommunityPage({ onNavigate }: CommunityPageProps) {
   const [posts, setPosts] = useState<PostData[]>([]);
   const [selectedTab, setSelectedTab] = useState('all');
+  const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -129,19 +129,6 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     }
   };
 
-  const filteredPosts = posts.filter(post => {
-    // 1. Lọc theo Tab (All, Questions, Polls, Tips)
-    const matchesTab = selectedTab === 'all' || post.type === selectedTab;
-
-    // 2. Lọc theo Search (Content hoặc Tags)
-    const query = searchQuery.toLowerCase().trim();
-    const matchesSearch = query === '' ||
-      post.content.toLowerCase().includes(query) ||
-      (post.tags && post.tags.some(tag => tag.toLowerCase().includes(query)));
-
-    return matchesTab && matchesSearch;
-  });
-
   const handleCreatePost = async () => {
     const finalType = createMode === 'poll' ? 'poll' : selectedGeneralType;
     if (createMode === 'poll') {
@@ -166,7 +153,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     if (createMode === 'poll') {
       payload.poll = {
         question: pollQuestion,
-        options: pollOptions.map((text, index) => ({ id: index + 1, text: text, votes: 0 })),
+        options: pollOptions.map((text, index) => ({ id: index, text: text, votes: 0 })),
         totalVotes: 0
       };
       // Poll thường nội dung chính là câu hỏi
@@ -233,6 +220,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
   };
 
   const handleVote = async (postId: string, optionId: number) => {
+    console.log('Voting for postId:', postId, 'optionId:', optionId, 'type:', typeof optionId);
     try {
       const res = await fetch(`http://localhost:8080/api/community/${postId}/vote?optionId=${optionId}`, {
         method: 'POST',
@@ -259,32 +247,19 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     alert("Link copied to clipboard!");
   };
 
-  // Dynamic Hot Topics derived from posts
-  const hotTopics = posts.reduce((acc, post) => {
-    if (post.tags) {
-      post.tags.forEach(tag => {
-        const existing = acc.find(t => t.tag === tag || t.tag === `#${tag}` || `#${t.tag}` === tag);
-        if (existing) {
-          existing.count += (post.likes + post.comments) * 10 + 100; // Fake engagement score
-        } else {
-          acc.push({ id: acc.length + 1, tag, count: (post.likes + post.comments) * 10 + 100, trending: false });
-        }
-      });
-    }
-    return acc;
-  }, [] as { id: number, tag: string, count: number, trending: boolean }[])
-    .sort((a, b) => b.count - a.count)
-    .slice(0, 6)
-    .map((t, i) => ({ ...t, trending: i < 2 }));
+  // Dynamic Hot Topics - Real counts from posts
+  const topicCounts: Record<string, number> = {};
+  posts.forEach(post => {
+    post.tags?.forEach(tag => {
+      const normalizedTag = tag.startsWith('#') ? tag : `#${tag}`;
+      topicCounts[normalizedTag] = (topicCounts[normalizedTag] || 0) + 1;
+    });
+  });
 
-  if (hotTopics.length === 0) {
-    // Fallback if no tags
-    hotTopics.push(
-      { id: 1, tag: '#EatClean', count: 12400, trending: true },
-      { id: 2, tag: '#StreetFood', count: 9850, trending: true },
-      { id: 3, tag: '#HomeCooking', count: 8200, trending: false }
-    );
-  }
+  const hotTopics = Object.entries(topicCounts)
+    .map(([tag, count]) => ({ tag, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 10); // Top 10 topics
 
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -373,16 +348,19 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     const hasVoted = Object.keys(userVotesMap).includes(currentUserId);
     const votedOptionId = userVotesMap[currentUserId];
 
+    console.log('PollComponent - Post:', post.id, 'Options:', post.poll.options.map((o, i) => ({ index: i, id: o.id, text: o.text })), 'VotedOptionId:', votedOptionId);
+
     return (
       <div className="mb-4 p-4 bg-muted/50 rounded-2xl border border-gray-100">
         <h5 className="font-semibold mb-3">{post.poll.question}</h5>
         <div className="space-y-2">
           {post.poll.options.map((option, idx) => {
-            const isSelected = votedOptionId === option.id;
+            // Use array index for comparison since MongoDB doesn't save the 'id' field
+            const isSelected = votedOptionId === idx;
             return (
               <button
-                key={`${option.id}-${idx}`}
-                onClick={() => handleVote(post.id, option.id)}
+                key={`${idx}-${option.text}`}
+                onClick={() => handleVote(post.id, idx)}
                 className={`w-full text-left p-3 rounded-xl border relative overflow-hidden transition-all hover:border-primary hover:bg-orange-50 cursor-pointer ${isSelected ? 'border-primary ring-1 ring-primary bg-orange-50' : 'border-gray-200 bg-white'
                   }`}
               >
@@ -390,7 +368,8 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
                 {hasVoted ? (
                   <>
                     <div className="flex items-center justify-between mb-1 relative z-10">
-                      <span className={`${isSelected ? 'font-bold text-primary' : 'font-medium'}`}>
+                      <span className={`flex items-center gap-2 ${isSelected ? 'font-bold text-primary' : 'font-medium'}`}>
+                        {isSelected && <Check className="w-4 h-4" />}
                         {option.text}
                       </span>
                       <span className="text-sm font-bold">{option.percentage}%</span>
@@ -543,6 +522,25 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     );
   };
 
+  // Filter posts by tab, topic, and search query
+  const filteredPosts = posts.filter(post => {
+    // Tab filter
+    const matchesTab = selectedTab === 'all' || post.type === selectedTab;
+
+    // Topic filter
+    const matchesTopic = !selectedTopic || post.tags?.some(tag => {
+      const normalizedTag = tag.startsWith('#') ? tag : `#${tag}`;
+      return normalizedTag === selectedTopic;
+    });
+
+    // Search filter
+    const matchesSearch = !searchQuery ||
+      post.content.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      post.tags?.some(tag => tag.toLowerCase().includes(searchQuery.toLowerCase()));
+
+    return matchesTab && matchesTopic && matchesSearch;
+  });
+
   // Current user mock data
   const currentUser = {
     name: 'You',
@@ -592,33 +590,40 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
                 <h2 className="font-bold text-lg">Hot Topics</h2>
               </div>
 
-              <ScrollArea className="w-full">
-                <div className="flex gap-2 pb-2 overflow-x-auto">
-                  {hotTopics.map((topic) => (
+              <div className="relative -mx-1 px-1">
+                <div className="flex gap-2 pb-3 overflow-x-auto" style={{ scrollbarWidth: 'thin', scrollbarColor: '#d1d5db transparent' }}>
+                  {hotTopics.map((topic, index) => (
                     <button
-                      key={topic.id}
-                      className="flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-primary/10 to-orange-100 hover:from-primary hover:to-orange-500 hover:text-white border border-primary/20 transition-all hover:scale-105 group"
+                      key={topic.tag}
+                      onClick={() => setSelectedTopic(selectedTopic === topic.tag ? null : topic.tag)}
+                      className={`flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full transition-all hover:scale-105 group ${selectedTopic === topic.tag
+                        ? 'bg-gradient-to-r from-primary to-orange-500 text-white border-2 border-primary font-bold ring-2 ring-primary/30'
+                        : 'bg-gradient-to-r from-primary/10 to-orange-100 hover:from-primary hover:to-orange-500 hover:text-white border border-primary/20'
+                        } ${index < 3 ? 'shadow-lg shadow-orange-200' : ''}`}
                     >
                       <div className="flex items-center gap-1.5 sm:gap-2">
-                        {topic.trending && (
-                          <span className="text-xs sm:text-sm">🔥</span>
+                        {index < 3 && (
+                          <span className="text-xs sm:text-sm animate-pulse">🔥</span>
                         )}
-                        <span className="font-medium text-xs sm:text-sm">{topic.tag}</span>
+                        <span className={`text-xs sm:text-sm ${selectedTopic === topic.tag ? 'font-bold' : 'font-medium'}`}>{topic.tag}</span>
                         <Badge
                           variant="outline"
-                          className="text-[10px] sm:text-xs bg-white/50 group-hover:bg-white/90"
+                          className={`text-[10px] sm:text-xs ${selectedTopic === topic.tag
+                            ? 'bg-white text-primary border-white'
+                            : 'bg-white/50 group-hover:bg-white/90'
+                            }`}
                         >
-                          {(topic.count / 1000).toFixed(1)}k
+                          {topic.count}
                         </Badge>
                       </div>
                     </button>
                   ))}
                 </div>
-              </ScrollArea>
+              </div>
             </div>
 
-            {/* RICH POST COMPOSER - Hide on mobile, show on tablet+ */}
-            <Card className="hidden sm:block p-3 sm:p-4 bg-gradient-to-br from-primary/5 via-orange-50/50 to-yellow-50/30 border-2 border-primary/20 shadow-lg hover:shadow-xl transition-all">
+            {/* RICH POST COMPOSER - Always visible on desktop (lg+) */}
+            <Card className="hidden lg:block p-3 sm:p-4 bg-gradient-to-br from-primary/5 via-orange-50/50 to-yellow-50/30 border-2 border-primary/20 shadow-lg hover:shadow-xl transition-all">
               <div className="flex gap-2 sm:gap-3">
                 {/* User Avatar */}
                 <Avatar className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-primary flex-shrink-0">
@@ -665,10 +670,30 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
             {/* Filter Tabs */}
             <Tabs value={selectedTab} onValueChange={setSelectedTab}>
               <TabsList className="grid w-full grid-cols-4 bg-muted/30">
-                <TabsTrigger value="all" className="rounded-xl">All</TabsTrigger>
-                <TabsTrigger value="question" className="rounded-xl">Questions</TabsTrigger>
-                <TabsTrigger value="poll" className="rounded-xl">Polls</TabsTrigger>
-                <TabsTrigger value="tip" className="rounded-xl">Tips</TabsTrigger>
+                <TabsTrigger
+                  value="all"
+                  className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:!text-white data-[state=active]:font-bold"
+                >
+                  All
+                </TabsTrigger>
+                <TabsTrigger
+                  value="question"
+                  className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:!text-white data-[state=active]:font-bold"
+                >
+                  Questions
+                </TabsTrigger>
+                <TabsTrigger
+                  value="poll"
+                  className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:!text-white data-[state=active]:font-bold"
+                >
+                  Polls
+                </TabsTrigger>
+                <TabsTrigger
+                  value="tip"
+                  className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:!text-white data-[state=active]:font-bold"
+                >
+                  Tips
+                </TabsTrigger>
               </TabsList>
             </Tabs>
 
@@ -679,7 +704,16 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
               ) : (
                 <div className="text-center py-10 text-gray-500">
                   <p>No posts found matching your criteria.</p>
-                  <Button variant="link" onClick={() => { setSelectedTab('all'); setSearchQuery(''); }}>Clear filters</Button>
+                  <Button
+                    variant="link"
+                    onClick={() => {
+                      setSelectedTab('all');
+                      setSelectedTopic(null);
+                      setSearchQuery('');
+                    }}
+                  >
+                    Clear filters
+                  </Button>
                 </div>
               )}
             </div>
@@ -775,19 +809,19 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
       </button>
 
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-        <DialogContent className="w-full h-full sm:w-auto sm:h-auto sm:max-w-lg max-h-screen sm:max-h-[85vh] overflow-y-auto p-4 sm:p-6">
-          <DialogHeader>
-            <DialogTitle>Create New Post</DialogTitle>
+        <DialogContent className="w-full h-fit sm:w-auto sm:h-auto sm:max-w-lg overflow-y-auto p-4 sm:p-5">
+          <DialogHeader className="pb-2">
+            <DialogTitle className="text-lg">Create New Post</DialogTitle>
           </DialogHeader>
 
           <Tabs value={createMode} onValueChange={setCreateMode} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 mb-4">
+            <TabsList className="grid w-full grid-cols-2 mb-3">
               <TabsTrigger value="general">Post / Question / Tip</TabsTrigger>
               <TabsTrigger value="poll">Poll</TabsTrigger>
             </TabsList>
 
             {createMode === 'general' ? (
-              <div className="space-y-4">
+              <div className="space-y-3">
                 <div className="flex gap-2 p-1 bg-muted/50 rounded-lg w-fit">
                   <button
                     onClick={() => setSelectedGeneralType('post')}
@@ -899,7 +933,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
               </div>
             )}
 
-            <div className="flex flex-col sm:flex-row justify-end mt-6 gap-2">
+            <div className="flex flex-col sm:flex-row justify-end mt-4 gap-2">
               <Button variant="ghost" onClick={() => setShowCreateModal(false)} className="w-full sm:w-auto">Cancel</Button>
               <Button onClick={handleCreatePost} disabled={isSubmitting} className="w-full sm:w-auto bg-primary hover:bg-orange-600 text-white min-w-[100px]">
                 {isSubmitting ? 'Posting...' : 'Post'}
