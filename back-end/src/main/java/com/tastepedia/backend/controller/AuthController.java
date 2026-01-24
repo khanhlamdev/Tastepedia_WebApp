@@ -65,6 +65,11 @@ public class AuthController {
         if (userRepository.existsByEmail(signUpRequest.getEmail())) {
             return ResponseEntity.badRequest().body("Lỗi: Email này đã được sử dụng!");
         }
+        
+        // Check trùng username
+        if (userRepository.existsByUsername(signUpRequest.getUsername())) {
+             return ResponseEntity.badRequest().body("Lỗi: Username này đã được sử dụng!");
+        }
 
         String randomOtp = String.valueOf((int) ((Math.random() * 900000) + 100000));
 
@@ -91,10 +96,11 @@ public class AuthController {
     // --- 3. API ĐĂNG NHẬP THƯỜNG (CÓ LƯU SESSION) ---
     @PostMapping("/signin")
     public ResponseEntity<?> authenticateUser(@RequestBody LoginRequest loginRequest, HttpSession session) {
-        Optional<User> userOptional = userRepository.findByEmail(loginRequest.getEmail());
+        // Find by USERNAME instead of Email
+        Optional<User> userOptional = userRepository.findByUsername(loginRequest.getUsername());
 
         if (userOptional.isEmpty()) {
-            return ResponseEntity.badRequest().body("Lỗi: Email không tồn tại!");
+            return ResponseEntity.badRequest().body("Lỗi: Username không tồn tại!");
         }
 
         User user = userOptional.get();

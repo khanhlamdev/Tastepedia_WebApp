@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { AuthPage } from './components/AuthPage';
 import { OnboardingPage } from './components/OnboardingPage';
@@ -25,100 +26,85 @@ import { CommunityPage } from './components/CommunityPage';
 import { IngredientMarketplacePage } from './components/IngredientMarketplacePage';
 import { MobileNavigation } from './components/MobileNavigation';
 import { RecipeManager } from './components/RecipeManager';
-
-type AppState =
-  | 'auth'
-  | 'login'
-  | 'signup'
-  | 'onboarding'
-  | 'home'
-  | 'search'
-  | 'recipe'
-  | 'reels'
-  | 'planner'
-  | 'chat'
-  | 'cart'
-  | 'checkout-shipping'
-  | 'checkout-payment'
-  | 'tracking'
-  | 'profile'
-  | 'wallet'
-  | 'notifications'
-  | 'settings'
-  | 'creator'
-  | 'recipe-manager'
-  | 'restaurants'
-  | 'restaurant-detail'
-  | 'food-tracking'
-  | 'community'
-  | 'marketplace'
-  | '404';
+import { FavoritesPage } from './components/FavoritesPage';
+import { MyRecipesPage } from './components/MyRecipesPage';
+import { EditRecipePage } from './components/EditRecipePage';
+import { EditProfilePage } from './components/EditProfilePage';
+import { ProtectedRoute } from './components/ProtectedRoute'; // Import ProtectedRoute
 
 export default function App() {
-  const [appState, setAppState] = useState<AppState>('auth');
+  const navigate = useNavigate();
+  const location = useLocation();
   const [selectedRecipe, setSelectedRecipe] = useState<string | null>(null);
-
-  // State loading để màn hình không bị nháy
   const [isLoadingSession, setIsLoadingSession] = useState(true);
+  const [currentSearchQuery, setCurrentSearchQuery] = useState('');
 
   const API_URL = "http://localhost:8080/api/auth";
 
-  // --- USE EFFECT QUAN TRỌNG: CHECK SESSION ---
+  // --- CHECK SESSION ---
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
-        // [QUAN TRỌNG] Thêm { withCredentials: true } để gửi Cookie JSESSIONID lên Server
         const res = await axios.get(`${API_URL}/me`, { withCredentials: true });
-
-        // Nếu Server bảo OK (200) -> Giữ ở trang Home
-        // Sync localStorage để Header hiển thị đúng
         localStorage.setItem('user', JSON.stringify(res.data));
-        setAppState('home');
+        // If on auth page and logged in, redirect to home
+        if (location.pathname === '/auth' || location.pathname === '/login' || location.pathname === '/signup') {
+          navigate('/');
+        }
       } catch (error) {
-        // Nếu không có session -> Cho phép vào Home ở chế độ Guest (khách)
-        // Header sẽ hiển thị nút Login/Signup
         console.log("Chưa đăng nhập, vào chế độ khách.");
-        setAppState('home');
+        localStorage.removeItem('user');
+        // Do not redirect here, let the Routes handle access
       } finally {
-        // Tắt loading dù thành công hay thất bại
         setIsLoadingSession(false);
       }
     };
 
     checkLoginStatus();
-  }, []);
+  }, [navigate, location.pathname]); // Add dependencies
 
-  const handleNavigate = (page: string, recipeId?: string) => {
-    setAppState(page as AppState);
-    if (recipeId) {
-      setSelectedRecipe(recipeId);
+  // --- LEGACY NAVIGATION HANDLER (Compatibility Layer) ---
+  const handleNavigate = (page: string, recipeId?: string, query?: string) => {
+    if (recipeId) setSelectedRecipe(recipeId);
+    if (query !== undefined) setCurrentSearchQuery(query);
+
+    switch (page) {
+      case 'home': navigate('/'); break;
+      case 'auth': navigate('/auth'); break;
+      case 'login': navigate('/login'); break;
+      case 'signup': navigate('/signup'); break;
+      case 'onboarding': navigate('/onboarding'); break;
+      case 'search': navigate(`/search${query ? `?q=${query}` : ''}`); break;
+      case 'recipe': navigate(`/recipe/${recipeId || ''}`); break;
+      case 'reels': navigate('/reels'); break;
+      case 'planner': navigate('/meal-planner'); break;
+      case 'chat': navigate('/chat'); break;
+      case 'community': navigate('/community'); break;
+      case 'cart': navigate('/cart'); break;
+      case 'marketplace': navigate('/marketplace'); break;
+      case 'checkout-shipping': navigate('/checkout/shipping'); break;
+      case 'checkout-payment': navigate('/checkout/payment'); break;
+      case 'tracking': navigate('/tracking'); break;
+      case 'restaurants': navigate('/restaurants'); break;
+      case 'restaurant-detail': navigate(`/restaurant/${recipeId || ''}`); break; // Reusing recipeId param for restaurantId
+      case 'food-tracking': navigate('/food-tracking'); break;
+      case 'profile': navigate('/profile'); break;
+      case 'wallet': navigate('/wallet'); break;
+      case 'notifications': navigate('/notifications'); break;
+      case 'settings': navigate('/settings'); break;
+      case 'creator': navigate('/creator'); break;
+      case 'recipe-manager': navigate('/recipe-manager'); break;
+      case 'favorites': navigate('/favorites'); break;
+      case 'my-recipes': navigate('/my-recipes'); break;
+      case 'edit-recipe': navigate(`/edit-recipe/${recipeId || ''}`); break;
+      case 'edit-profile': navigate('/edit-profile'); break;
+      default: navigate('*'); // 404
     }
     window.scrollTo(0, 0);
   };
 
-  const handleAuthComplete = () => {
-    setAppState('home');
-  };
+  const showMobileNav = !['/auth', '/login', '/signup', '/onboarding'].includes(location.pathname);
 
-  const handleOnboardingComplete = () => {
-    setAppState('home');
-  };
-
-  const showMobileNav = [
-    'home',
-    'recipe',
-    'search',
-    'planner',
-    'profile',
-    'cart',
-    'tracking',
-    'wallet',
-    'notifications',
-    'settings',
-    'creator',
-  ].includes(appState);
-
-  // Màn hình chờ khi đang check session
   if (isLoadingSession) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
@@ -130,37 +116,69 @@ export default function App() {
     );
   }
 
+  // Determine currentPage for MobileNav (simplified mapping)
+  const getCurrentPage = () => {
+    const path = location.pathname;
+    if (path === '/') return 'home';
+    if (path.startsWith('/recipe/')) return 'recipe';
+    if (path.startsWith('/search')) return 'search';
+    if (path.startsWith('/meal-planner')) return 'planner';
+    if (path.startsWith('/profile')) return 'profile';
+    if (path.startsWith('/cart')) return 'cart';
+    if (path.startsWith('/tracking')) return 'tracking';
+    if (path.startsWith('/wallet')) return 'wallet';
+    if (path.startsWith('/notifications')) return 'notifications';
+    if (path.startsWith('/settings')) return 'settings';
+    if (path.startsWith('/creator')) return 'creator';
+    return 'home'; // default
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      {appState === 'auth' && <AuthPage onComplete={handleAuthComplete} onNavigate={handleNavigate} />}
-      {appState === 'login' && <AuthPage initialView="login" onComplete={handleAuthComplete} onNavigate={handleNavigate} />}
-      {appState === 'signup' && <AuthPage initialView="signup" onComplete={handleAuthComplete} onNavigate={handleNavigate} />}
-      {appState === 'onboarding' && <OnboardingPage onComplete={handleOnboardingComplete} />}
-      {appState === 'home' && <HomePage onNavigate={handleNavigate} />}
-      {appState === 'search' && <SearchPage onNavigate={handleNavigate} />}
-      {appState === 'reels' && <ReelsPage onNavigate={handleNavigate} />}
-      {appState === 'recipe' && <RecipeDetailPage onNavigate={handleNavigate} />}
-      {appState === 'planner' && <MealPlannerPage onNavigate={handleNavigate} />}
-      {appState === 'chat' && <ChatSupportPage onNavigate={handleNavigate} />}
-      {appState === 'community' && <CommunityPage onNavigate={handleNavigate} />}
-      {appState === 'cart' && <CartPage onNavigate={handleNavigate} />}
-      {appState === 'marketplace' && <IngredientMarketplacePage onNavigate={handleNavigate} />}
-      {appState === 'checkout-shipping' && <CheckoutShippingPage onNavigate={handleNavigate} />}
-      {appState === 'checkout-payment' && <CheckoutPaymentPage onNavigate={handleNavigate} />}
-      {appState === 'tracking' && <OrderTrackingPage onNavigate={handleNavigate} />}
-      {appState === 'restaurants' && <RestaurantListPage onNavigate={handleNavigate} />}
-      {appState === 'restaurant-detail' && <RestaurantDetailPage onNavigate={handleNavigate} />}
-      {appState === 'food-tracking' && <FoodOrderTrackingPage onNavigate={handleNavigate} />}
-      {appState === 'profile' && <ProfilePage onNavigate={handleNavigate} />}
-      {appState === 'wallet' && <TasteWalletPage onNavigate={handleNavigate} />}
-      {appState === 'notifications' && <NotificationsPage onNavigate={handleNavigate} />}
-      {appState === 'settings' && <SettingsPage onNavigate={handleNavigate} />}
-      {appState === 'creator' && <CreatorStudioPage onNavigate={handleNavigate} />}
-      {appState === 'recipe-manager' && <RecipeManager />}
-      {appState === '404' && <NotFoundPage onNavigate={handleNavigate} />}
+      <Routes>
+        {/* Public Routes */}
+        <Route path="/" element={<HomePage onNavigate={handleNavigate} />} />
+        <Route path="/auth" element={<AuthPage onComplete={() => navigate('/')} onNavigate={handleNavigate} />} />
+        <Route path="/login" element={<AuthPage initialView="login" onComplete={() => navigate('/')} onNavigate={handleNavigate} />} />
+        <Route path="/signup" element={<AuthPage initialView="signup" onComplete={() => navigate('/')} onNavigate={handleNavigate} />} />
+        <Route path="/onboarding" element={<OnboardingPage onComplete={() => navigate('/')} />} />
+
+        <Route path="/search" element={<SearchPage onNavigate={handleNavigate} initialQuery={currentSearchQuery} />} />
+        <Route path="/recipe/:id" element={<RecipeDetailPage onNavigate={handleNavigate} recipeId={selectedRecipe} />} />
+        <Route path="/reels" element={<ReelsPage onNavigate={handleNavigate} />} />
+        <Route path="/restaurants" element={<RestaurantListPage onNavigate={handleNavigate} />} />
+        <Route path="/restaurant/:id" element={<RestaurantDetailPage onNavigate={handleNavigate} />} />
+        <Route path="/community" element={<CommunityPage onNavigate={handleNavigate} />} />
+        <Route path="/marketplace" element={<IngredientMarketplacePage onNavigate={handleNavigate} />} />
+        <Route path="/chat" element={<ChatSupportPage onNavigate={handleNavigate} />} />
+
+        {/* Protected Routes */}
+        <Route element={<ProtectedRoute />}>
+          <Route path="/meal-planner" element={<MealPlannerPage onNavigate={handleNavigate} />} />
+          <Route path="/cart" element={<CartPage onNavigate={handleNavigate} />} />
+          <Route path="/checkout/shipping" element={<CheckoutShippingPage onNavigate={handleNavigate} />} />
+          <Route path="/checkout/payment" element={<CheckoutPaymentPage onNavigate={handleNavigate} />} />
+          <Route path="/tracking" element={<OrderTrackingPage onNavigate={handleNavigate} />} />
+          <Route path="/food-tracking" element={<FoodOrderTrackingPage onNavigate={handleNavigate} />} />
+          <Route path="/profile" element={<ProfilePage onNavigate={handleNavigate} />} />
+          <Route path="/wallet" element={<TasteWalletPage onNavigate={handleNavigate} />} />
+          <Route path="/notifications" element={<NotificationsPage onNavigate={handleNavigate} />} />
+          <Route path="/settings" element={<SettingsPage onNavigate={handleNavigate} />} />
+          <Route path="/creator" element={<CreatorStudioPage onNavigate={handleNavigate} />} />
+          <Route path="/recipe-manager" element={<RecipeManager />} />
+          <Route path="/favorites" element={<FavoritesPage onNavigate={handleNavigate} />} />
+          <Route path="/my-recipes" element={<MyRecipesPage onNavigate={handleNavigate} />} />
+          <Route path="/edit-recipe/:id" element={<EditRecipePage onNavigate={handleNavigate} recipeId={null} />} /> {/* recipeId handled by params in component */}
+          <Route path="/create-recipe" element={<EditRecipePage onNavigate={handleNavigate} recipeId={null} />} />
+          <Route path="/edit-profile" element={<EditProfilePage onNavigate={handleNavigate} />} />
+        </Route>
+
+        {/* 404 */}
+        <Route path="*" element={<NotFoundPage onNavigate={handleNavigate} />} />
+      </Routes>
 
       {showMobileNav && (
-        <MobileNavigation currentPage={appState} onNavigate={handleNavigate} />
+        <MobileNavigation currentPage={getCurrentPage()} onNavigate={handleNavigate} />
       )}
     </div>
   );
