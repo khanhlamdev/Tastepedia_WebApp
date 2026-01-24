@@ -13,6 +13,10 @@ public class Recipe {
     private String id;
 
     private String title;
+    
+    // Shadow field cho tìm kiếm không dấu
+    private String searchText; // "banh mi thit nuong"
+
     private String description;
     private int cookTime; // Phút
     private int servings; // Khẩu phần
@@ -22,9 +26,16 @@ public class Recipe {
     private String mainImageUrl;
     private List<String> subImageUrls;
 
-    // Các class con (bên dưới)
+    // --- PHÂN LOẠI MÓN ĂN & QUỐC GIA (MỚI THÊM) ---
+    private List<String> dietaryType; // Ví dụ: ["Mặn", "Healthy"]
+    private String cuisine;           // Ví dụ: "Việt Nam"
+
+    // Các class con
     private List<Ingredient> ingredients;
     private List<Step> steps;
+
+    // --- FIELD DINH DƯỠNG MỚI ---
+    private Nutrition nutrition;
 
     // Thông tin người đăng (Lấy từ Session)
     private String authorId;
@@ -33,8 +44,8 @@ public class Recipe {
     // Thông tin tài chính
     private Double totalCost;
     private Double estimatedCommission;
-    
-    // Cài đặt bài đăng
+
+    // Cài đặt bài đăng (Jackson sẽ tự động map "premium" -> "isPremium")
     private boolean isPremium;
     private String visibility; // "public", "private", "subscribers"
 
@@ -53,5 +64,13 @@ public class Recipe {
     public static class Step {
         private int stepNumber;
         private String content;
+    }
+
+    @Data
+    public static class Nutrition {
+        private int calories;
+        private int carb;
+        private int protein;
+        private int fat;
     }
 }

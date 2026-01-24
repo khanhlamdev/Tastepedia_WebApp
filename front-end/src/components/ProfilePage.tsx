@@ -88,7 +88,7 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
           <div className="flex items-center gap-3 mb-6">
             <button
               onClick={() => onNavigate('home')}
-              className="p-2 hover:bg-white/10 rounded-full md:hidden"
+              className="p-2 hover:bg-white/10 rounded-full transition-colors"
             >
               <ArrowLeft className="w-6 h-6" />
             </button>
@@ -131,6 +131,7 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
 
             <Button
               variant="outline"
+              onClick={() => onNavigate('edit-profile')}
               className="bg-white text-[#FF6B35] hover:bg-white/90 border-0 rounded-full px-6"
             >
               <Settings className="w-4 h-4 mr-2" />
@@ -266,7 +267,27 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
               <h3 className="text-xl font-bold mb-4">Account Settings</h3>
 
               <div className="space-y-1">
-                <button 
+                <button
+                  onClick={() => onNavigate('favorites')}
+                  className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-xl transition-colors"
+                >
+                  <Heart className="w-5 h-5 text-red-500 fill-red-500" />
+                  <span className="flex-1 text-left font-medium">Yêu thích</span>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </button>
+
+                <button
+                  onClick={() => onNavigate('my-recipes')}
+                  className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-xl transition-colors"
+                >
+                  <ChefHat className="w-5 h-5 text-[#FF6B35]" />
+                  <span className="flex-1 text-left font-medium">Bài đăng của tôi</span>
+                  <ChevronRight className="w-5 h-5 text-gray-400" />
+                </button>
+
+                <Separator className="my-2" />
+
+                <button
                   onClick={() => onNavigate('wallet')}
                   className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-xl transition-colors"
                 >
@@ -275,7 +296,7 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
                   <ChevronRight className="w-5 h-5 text-gray-400" />
                 </button>
 
-                <button 
+                <button
                   onClick={() => onNavigate('creator')}
                   className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-xl transition-colors"
                 >
@@ -284,7 +305,7 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
                   <ChevronRight className="w-5 h-5 text-gray-400" />
                 </button>
 
-                <button 
+                <button
                   onClick={() => onNavigate('settings')}
                   className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-xl transition-colors"
                 >
@@ -293,7 +314,7 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
                   <ChevronRight className="w-5 h-5 text-gray-400" />
                 </button>
 
-                <button 
+                <button
                   onClick={() => onNavigate('chat')}
                   className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-xl transition-colors"
                 >

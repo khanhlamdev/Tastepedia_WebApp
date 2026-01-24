@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { Search, ShoppingCart, Bell, User, LogOut } from 'lucide-react';
 import { Input } from '../ui/input';
@@ -9,12 +10,14 @@ import { Badge } from '../ui/badge';
 import { Avatar } from '../ui/avatar';
 
 interface HeaderProps {
-  onNavigate: (page: string, recipeId?: string) => void;
+  onNavigate?: (page: string, recipeId?: string, query?: string) => void;
 }
 
 export function Header({ onNavigate }: HeaderProps) {
+  const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [searchTerm, setSearchTerm] = useState('');
 
   useEffect(() => {
     // Check if user is logged in (from localStorage or auth service)
@@ -34,7 +37,13 @@ export function Header({ onNavigate }: HeaderProps) {
     } finally {
       localStorage.removeItem('user');
       setIsLoggedIn(false);
-      onNavigate('home');
+      navigate('/');
+    }
+  };
+
+  const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      navigate(`/search?q=${searchTerm}`);
     }
   };
 
@@ -45,7 +54,7 @@ export function Header({ onNavigate }: HeaderProps) {
       <div className="max-w-7xl mx-auto px-4 py-3 md:py-4">
         <div className="flex items-center gap-4">
           {/* Logo */}
-          <div className="text-2xl font-bold text-[#FF6B35] hidden md:block cursor-pointer" onClick={() => onNavigate('home')}>
+          <div className="text-2xl font-bold text-[#FF6B35] hidden md:block cursor-pointer" onClick={() => navigate('/')}>
             Tastepedia
           </div>
 
@@ -54,7 +63,10 @@ export function Header({ onNavigate }: HeaderProps) {
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
             <Input
               placeholder="Ingredient or Dish name..."
-              className="pl-10 pr-4 h-11 rounded-full bg-[#F9F9F9] border-0"
+              className="pl-10 pr-4 h-11 rounded-full bg-[#F9F9F9] border-0 focus-visible:ring-1 focus-visible:ring-[#FF6B35]"
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              onKeyDown={handleSearch}
             />
           </div>
 
@@ -63,14 +75,14 @@ export function Header({ onNavigate }: HeaderProps) {
             {!isLoggedIn ? (
               <>
                 <Button
-                  onClick={() => onNavigate('login')}
+                  onClick={() => navigate('/login')}
                   variant="outline"
                   className="hidden sm:inline-flex rounded-full px-6 h-10"
                 >
                   Login
                 </Button>
                 <Button
-                  onClick={() => onNavigate('signup')}
+                  onClick={() => navigate('/signup')}
                   className="bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-full px-6 h-10"
                 >
                   Sign Up
@@ -79,7 +91,7 @@ export function Header({ onNavigate }: HeaderProps) {
             ) : (
               <>
                 <button
-                  onClick={() => onNavigate('cart')}
+                  onClick={() => navigate('/cart')}
                   className="relative p-2 hover:bg-muted rounded-full transition-colors"
                 >
                   <ShoppingCart className="w-6 h-6 text-foreground" />
@@ -88,7 +100,7 @@ export function Header({ onNavigate }: HeaderProps) {
                   </Badge>
                 </button>
                 <button
-                  onClick={() => onNavigate('notifications')}
+                  onClick={() => navigate('/notifications')}
                   className="relative p-2 hover:bg-muted rounded-full transition-colors hidden md:block"
                 >
                   <Bell className="w-6 h-6 text-foreground" />
@@ -96,7 +108,7 @@ export function Header({ onNavigate }: HeaderProps) {
                     2
                   </Badge>
                 </button>
-                <button onClick={() => onNavigate('profile')} className="hidden md:block">
+                <button onClick={() => navigate('/profile')} className="hidden md:block">
                   <Avatar className="h-9 w-9 border-2 border-border hover:border-[#FF6B35] transition-colors">
                     <div className="bg-[#FF6B35] text-white flex items-center justify-center h-full w-full">
                       <User className="w-5 h-5" />

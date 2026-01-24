@@ -130,7 +130,7 @@ export function AuthPage({ onComplete, onNavigate, initialView = 'login' }: Auth
       } else {
         // === SIGN IN ===
         // Thêm withCredentials: true để nhận cookie session từ backend
-        const response = await axios.post(`${API_URL}/signin`, { email, password }, { withCredentials: true });
+        const response = await axios.post(`${API_URL}/signin`, { username, password }, { withCredentials: true });
 
         handleAuthSuccess(response.data);
       }
@@ -228,15 +228,20 @@ export function AuthPage({ onComplete, onNavigate, initialView = 'login' }: Auth
               </div>
             ) : (
               <>
-                {!isLogin && (
+                {!isLogin ? (
+                  // SIGN UP VIEW
                   <>
-                    <div className="relative"><User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input type="text" placeholder="Full Name" className="pl-10 h-12 rounded-2xl bg-[#F9F9F9]" value={fullName} onChange={(e) => setFullName(e.target.value)} required={!isLogin} /></div>
-                    <div className="relative"><User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input type="text" placeholder="Username (@nickname)" className="pl-10 h-12 rounded-2xl bg-[#F9F9F9]" value={username} onChange={(e) => setUsername(e.target.value)} required={!isLogin} /></div>
+                    <div className="relative"><User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input type="text" placeholder="Full Name" className="pl-10 h-12 rounded-2xl bg-[#F9F9F9]" value={fullName} onChange={(e) => setFullName(e.target.value)} required /></div>
+                    <div className="relative"><User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input type="text" placeholder="Username (@nickname)" className="pl-10 h-12 rounded-2xl bg-[#F9F9F9]" value={username} onChange={(e) => setUsername(e.target.value)} required /></div>
+                    <div className="relative"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input type="email" placeholder="Email" className="pl-10 h-12 rounded-2xl bg-[#F9F9F9]" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
                   </>
+                ) : (
+                  // LOGIN VIEW - Use Username
+                  <div className="relative"><User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input type="text" placeholder="Username" className="pl-10 h-12 rounded-2xl bg-[#F9F9F9]" value={username} onChange={(e) => setUsername(e.target.value)} required /></div>
                 )}
-                <div className="relative"><Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input type="email" placeholder="Email" className="pl-10 h-12 rounded-2xl bg-[#F9F9F9]" value={email} onChange={(e) => setEmail(e.target.value)} required /></div>
+
                 <div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input type={showPassword ? 'text' : 'password'} placeholder="Password" className="pl-10 pr-10 h-12 rounded-2xl bg-[#F9F9F9]" value={password} onChange={(e) => setPassword(e.target.value)} required /><button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400">{showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}</button></div>
-                {!isLogin && (<div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input type="password" placeholder="Confirm Password" className="pl-10 h-12 rounded-2xl bg-[#F9F9F9]" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required={!isLogin} /></div>)}
+                {!isLogin && (<div className="relative"><Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" /><Input type="password" placeholder="Confirm Password" className="pl-10 h-12 rounded-2xl bg-[#F9F9F9]" value={confirmPassword} onChange={(e) => setConfirmPassword(e.target.value)} required /></div>)}
                 {!isLogin && (<div className="flex items-center space-x-2"><Checkbox id="creator" checked={wantsToBeCreator} onCheckedChange={(c) => setWantsToBeCreator(c as boolean)} /><label htmlFor="creator" className="text-sm text-gray-700">I want to be a Creator</label></div>)}
                 {isLogin && (<div className="text-right"><button type="button" onClick={() => setShowForgotPassword(true)} className="text-sm text-[#FF6B35] hover:underline">Forgot Password?</button></div>)}
               </>
