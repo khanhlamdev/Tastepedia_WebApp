@@ -1,26 +1,59 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, Heart, MessageCircle, Share2, MoreVertical, TrendingUp, Award, Search, Plus, Camera, Video, UtensilsCrossed, Image as ImageIcon } from 'lucide-react';
+import {
+  ArrowLeft, Heart, MessageCircle, Share2, MoreHorizontal, TrendingUp, Award, Search,
+  Plus, Camera, Video, UtensilsCrossed, HelpCircle, Lightbulb, FileText, Send, Flag, Trash2, Edit, X, Loader2, Image as ImageIcon
+} from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Avatar } from './ui/avatar';
 import { Badge } from './ui/badge';
 import { Input } from './ui/input';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
 import { Progress } from './ui/progress';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "./ui/dropdown-menu";
+
+function formatTimeAgo(dateString: string): string {
+  const date = new Date(dateString);
+  const now = new Date();
+  const seconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (seconds < 60) return 'Just now';
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes} minute${minutes > 1 ? 's' : ''} ago`;
+
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours} hour${hours > 1 ? 's' : ''} ago`;
+
+  const days = Math.floor(hours / 24);
+  if (days < 7) return `${days} day${days > 1 ? 's' : ''} ago`;
+
+  // Nếu quá 7 ngày thì hiển thị ngày tháng năm
+  return date.toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
+}
 
 interface CommunityPageProps {
   onNavigate: (page: string) => void;
 }
 
-interface PollOption {
-  id: number;
-  text: string;
-  votes: number;
-  percentage?: number; // Frontend tự tính
+interface CommentData {
+  id: string;
+  userId: string;
+  authorName: string;
+  authorAvatar: string;
+  content: string;
+  createdAt: string;
+  likes: number;
+  replies: CommentData[];
 }
 
 interface PostData {
@@ -37,39 +70,43 @@ interface PostData {
   comments: number;
   poll?: {
     question: string;
-    options: PollOption[];
+    options: { id: number; text: string; votes: number; percentage?: number }[];
     totalVotes: number;
-    userVoted?: number; // ID option user đã vote
+    userVotes?: Record<string, number>; // Map<UserId, OptionId>
   };
-  likedUserIds: string;
+  likedUserIds: string | string[];
 }
 
 export function CommunityPage({ onNavigate }: CommunityPageProps) {
   const [posts, setPosts] = useState<PostData[]>([]);
   const [selectedTab, setSelectedTab] = useState('all');
-  const [showCreateModal, setShowCreateModal] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [showFABLabel, setShowFABLabel] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
 
-    // Form State
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [createMode, setCreateMode] = useState('general');
+  const [selectedGeneralType, setSelectedGeneralType] = useState('post');
   const [newPostContent, setNewPostContent] = useState('');
-  const [newPostType, setNewPostType] = useState('post'); // post, question, tip, poll
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
+  const [imageUrl, setImageUrl] = useState('');
+  const [tagsInput, setTagsInput] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
 
-  const [imageUrl, setImageUrl] = useState(''); // State cho link ảnh
-  const [tagsInput, setTagsInput] = useState(''); // State cho tags (nhập chuỗi)
+  const [selectedPost, setSelectedPost] = useState<PostData | null>(null); // Bài viết đang xem chi tiết
+  const [postComments, setPostComments] = useState<CommentData[]>([]);
+  const [newCommentContent, setNewCommentContent] = useState('');
+  const [replyingTo, setReplyingTo] = useState<string | null>(null); // ID comment đang reply
 
-  useEffect(() => {
-      const handleScroll = () => {
-          setShowFABLabel(window.scrollY < 100);
-      };
-      window.addEventListener('scroll', handleScroll);
-      return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  const [showFABLabel, setShowFABLabel] = useState(true);
 
   useEffect(() => {
     fetchPosts();
+    const handleScroll = () => {
+      setShowFABLabel(window.scrollY < 100);
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
   }, []);
 
   const fetchPosts = async () => {
@@ -92,82 +129,184 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     }
   };
 
+  const filteredPosts = posts.filter(post => {
+    // 1. Lọc theo Tab (All, Questions, Polls, Tips)
+    const matchesTab = selectedTab === 'all' || post.type === selectedTab;
+
+    // 2. Lọc theo Search (Content hoặc Tags)
+    const query = searchQuery.toLowerCase().trim();
+    const matchesSearch = query === '' ||
+      post.content.toLowerCase().includes(query) ||
+      (post.tags && post.tags.some(tag => tag.toLowerCase().includes(query)));
+
+    return matchesTab && matchesSearch;
+  });
+
   const handleCreatePost = async () => {
-      if (!newPostContent.trim() && newPostType !== 'poll') return;
-      if (newPostType === 'poll' && (!pollQuestion.trim() || pollOptions.some(o => !o.trim()))) return;
+    const finalType = createMode === 'poll' ? 'poll' : selectedGeneralType;
+    if (createMode === 'poll') {
+      if (!pollQuestion.trim() || pollOptions.some(o => !o.trim())) return;
+    } else {
+      if (!newPostContent.trim()) return;
+    }
 
-      setIsSubmitting(true);
+    setIsSubmitting(true);
 
-      // Lấy User từ LocalStorage (như bài trước)
-      const savedUserStr = localStorage.getItem('user');
-      let currentUser = { _id: 'guest', fullName: 'Guest User', avatar: 'G' };
-      if (savedUserStr) {
-          try {
-              const parsed = JSON.parse(savedUserStr);
-              currentUser = {
-                  _id: parsed._id || parsed.id,
-                  fullName: parsed.fullName,
-                  avatar: parsed.fullName.charAt(0).toUpperCase()
-              };
-          } catch(e) {}
-      }
+    const processedTags = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
 
-      const processedTags = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
+    const payload: any = {
+      type: finalType,
+      content: newPostContent,
+      likes: 0,
+      comments: 0,
+      image: imageUrl, // Gửi link ảnh lên server
+      tags: processedTags.length > 0 ? processedTags : [],
+    };
 
-      const payload: any = {
-        type: newPostType,
-        content: newPostContent,
-        userId: currentUser._id,
-        authorName: currentUser.fullName,
-        authorAvatar: currentUser.avatar,
-        authorBadge: "Newbie", // Tạm để cứng
-        likes: 0,
-        comments: 0,
-        image: imageUrl, // Gửi link ảnh lên server
-        tags: processedTags.length > 0 ? processedTags : [],
+    if (createMode === 'poll') {
+      payload.poll = {
+        question: pollQuestion,
+        options: pollOptions.map((text, index) => ({ id: index + 1, text: text, votes: 0 })),
+        totalVotes: 0
       };
+      // Poll thường nội dung chính là câu hỏi
+      if (!payload.content) payload.content = pollQuestion;
+    }
 
-      if (newPostType === 'poll') {
-        payload.poll = {
-          question: pollQuestion,
-          options: pollOptions.map((text, index) => ({ id: index + 1, text: text, votes: 0 })),
-          totalVotes: 0
-        };
-        // Poll thường nội dung chính là câu hỏi
-        if (!payload.content) payload.content = pollQuestion;
+    try {
+      const res = await fetch('http://localhost:8080/api/community/create', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify(payload)
+      });
+
+      if (res.ok) {
+        setShowCreateModal(false);
+        setNewPostContent('');
+        setPollQuestion('');
+        setPollOptions(['', '']);
+        setImageUrl('');
+        setTagsInput('');
+        setCreateMode('general'); // Reset về mặc định
+        setSelectedGeneralType('post');
+        fetchPosts();
+      } else if (res.status === 401) {
+        alert("Vui lòng đăng nhập để đăng bài!");
+        onNavigate('login');
       }
-
-      try {
-        const res = await fetch('http://localhost:8080/api/community/create', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload)
-        });
-
-        if (res.ok) {
-          setShowCreateModal(false);
-          setNewPostContent('');
-          setPollQuestion('');
-          setPollOptions(['', '']);
-          setImageUrl('');
-          setTagsInput('');
-          fetchPosts();
-        }
-      } catch (err) {
-        console.error("Error creating post", err);
-      } finally {
-        setIsSubmitting(false);
-      }
+    } catch (err) {
+      console.error("Error creating post", err);
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
-  const hotTopics = [
-    { id: 1, tag: '#EatClean', count: 12400, trending: true },
-    { id: 2, tag: '#StreetFood', count: 9850, trending: true },
-    { id: 3, tag: '#HomeCooking', count: 8200, trending: false },
-    { id: 4, tag: '#VeganLife', count: 7600, trending: false },
-    { id: 5, tag: '#BakingLove', count: 6900, trending: false },
-    { id: 6, tag: '#AsianCuisine', count: 5400, trending: true },
-  ];
+  const handleVote = async (postId: string, optionId: number) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/${postId}/vote?optionId=${optionId}`, {
+        method: 'POST', credentials: 'include'
+      });
+      if (res.ok) fetchPosts(); // Reload để cập nhật số vote
+      else if (res.status === 401) alert("Please login to vote!");
+      else alert("Failed to vote or already voted.");
+    } catch (e) { console.error(e); }
+  };
+
+  const openPostDetail = async (post: PostData) => {
+    setSelectedPost(post);
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/${post.id}/comments`, { credentials: 'include' });
+      if (res.ok) setPostComments(await res.json());
+    } catch (e) { console.error(e); }
+  };
+
+  const handleSendComment = async () => {
+    if (!selectedPost || !newCommentContent.trim()) return;
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/${selectedPost.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          content: newCommentContent,
+          parentCommentId: replyingTo
+        })
+      });
+      if (res.ok) {
+        setNewCommentContent('');
+        setReplyingTo(null);
+        // Reload comments & Post (để cập nhật số comment count)
+        openPostDetail(selectedPost);
+        fetchPosts();
+      } else if (res.status === 401) alert("Please login to comment!");
+    } catch (e) { console.error(e); }
+  };
+
+  const handleShare = (post: PostData) => {
+    navigator.clipboard.writeText(`http://localhost:3000/post/${post.id}`);
+    alert("Link copied to clipboard!");
+  };
+
+  // Dynamic Hot Topics derived from posts
+  const hotTopics = posts.reduce((acc, post) => {
+    if (post.tags) {
+      post.tags.forEach(tag => {
+        const existing = acc.find(t => t.tag === tag || t.tag === `#${tag}` || `#${t.tag}` === tag);
+        if (existing) {
+          existing.count += (post.likes + post.comments) * 10 + 100; // Fake engagement score
+        } else {
+          acc.push({ id: acc.length + 1, tag, count: (post.likes + post.comments) * 10 + 100, trending: false });
+        }
+      });
+    }
+    return acc;
+  }, [] as { id: number, tag: string, count: number, trending: boolean }[])
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 6)
+    .map((t, i) => ({ ...t, trending: i < 2 }));
+
+  if (hotTopics.length === 0) {
+    // Fallback if no tags
+    hotTopics.push(
+      { id: 1, tag: '#EatClean', count: 12400, trending: true },
+      { id: 2, tag: '#StreetFood', count: 9850, trending: true },
+      { id: 3, tag: '#HomeCooking', count: 8200, trending: false }
+    );
+  }
+
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const res = await fetch('http://localhost:8080/api/community/upload', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include'
+      });
+
+      if (res.ok) {
+        const data = await res.json();
+        setImageUrl(data.url);
+      } else if (res.status === 401) {
+        alert("Please login to upload images!");
+        onNavigate('login');
+      } else {
+        const errorText = await res.text();
+        alert("Upload failed: " + errorText);
+      }
+    } catch (err) {
+      console.error("Upload error", err);
+      alert("Upload failed. Please try again.");
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   const topContributors = [
     {
@@ -212,36 +351,112 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     },
   ];
 
-  const PostCard = ({ post }: { post: PostData }) => {
-      const savedUserStr = localStorage.getItem('user');
-      const currentUserId = savedUserStr ? JSON.parse(savedUserStr)._id || JSON.parse(savedUserStr).id : 'guest';
-      const isLikedInitial = (post as any).likedUserIds?.includes(currentUserId);
-      const [localLikes, setLocalLikes] = useState(post.likes);
-      const [isLiked, setIsLiked] = useState(isLikedInitial);
+  const PollComponent = ({ post }: { post: PostData }) => {
+    if (!post.poll) return null;
 
-      const handleLike = async () => {
-            // 1. Cập nhật UI ngay lập tức cho mượt
-            const newIsLiked = !isLiked;
-            setIsLiked(newIsLiked);
-            setLocalLikes(newIsLiked ? localLikes + 1 : localLikes - 1);
+    // Lấy User ID hiện tại từ localStorage để check xem đã vote chưa
+    // (Cách này chỉ mang tính hiển thị UI, Backend đã check kỹ rồi)
+    const savedUserStr = localStorage.getItem('user');
+    const currentUserId = savedUserStr ? JSON.parse(savedUserStr)._id || JSON.parse(savedUserStr).id : 'guest';
 
-            // 2. Gọi API ngầm
-            try {
-              await fetch(`http://localhost:8080/api/community/${post.id}/like`, {
-                  method: 'PUT',
-                  headers: { 'Content-Type': 'application/json' }, // Dùng text/plain cũng được nếu backend chỉnh
-                  body: currentUserId // Gửi ID người like
-              });
-            } catch (error) {
-              console.error("Like error", error);
-              // Revert nếu lỗi
-              setIsLiked(!newIsLiked);
-              setLocalLikes(localLikes);
-            }
-      };
+    const userVotesMap = post.poll.userVotes || {};
+    const hasVoted = Object.keys(userVotesMap).includes(currentUserId);
+    const votedOptionId = userVotesMap[currentUserId];
 
     return (
-      <Card className="p-6 hover:shadow-lg transition-all duration-300">
+      <div className="mb-4 p-4 bg-muted/50 rounded-2xl border border-gray-100">
+        <h5 className="font-semibold mb-3">{post.poll.question}</h5>
+        <div className="space-y-2">
+          {post.poll.options.map((option, idx) => {
+            const isSelected = votedOptionId === option.id;
+            return (
+              <button
+                key={`${option.id}-${idx}`}
+                onClick={() => handleVote(post.id, option.id)}
+                // disabled={hasVoted} // Allow re-vote
+                className={`w-full text-left p-3 rounded-xl border relative overflow-hidden transition-all ${hasVoted ? 'cursor-default' : 'hover:border-primary hover:bg-orange-50 cursor-pointer'
+                  } ${isSelected ? 'border-primary ring-1 ring-primary bg-orange-50' : 'border-gray-200 bg-white'}`}
+              >
+                {/* Nếu đã vote -> Hiện Progress bar và %, Nếu chưa -> Chỉ hiện Text */}
+                {hasVoted ? (
+                  <>
+                    <div className="flex items-center justify-between mb-1 relative z-10">
+                      <span className={`font-medium ${isSelected ? 'text-primary' : ''}`}>
+                        {option.text} {isSelected && '(You)'}
+                      </span>
+                      <span className="text-sm font-bold">{option.percentage}%</span>
+                    </div>
+                    <Progress value={option.percentage} className="h-1.5" />
+                  </>
+                ) : (
+                  <div className="flex items-center justify-between relative z-10">
+                    <span className="font-medium">{option.text}</span>
+                  </div>
+                )}
+              </button>
+            );
+          })}
+        </div>
+        <p className="text-sm text-muted-foreground mt-3 text-center">
+          {post.poll.totalVotes} votes
+        </p>
+      </div>
+    );
+  };
+
+  // 2. Component Dropdown 3 chấm
+  const PostOptions = () => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+        <DropdownMenuItem><Edit className="w-4 h-4 mr-2" /> Edit Post</DropdownMenuItem>
+        <DropdownMenuItem><Flag className="w-4 h-4 mr-2" /> Report</DropdownMenuItem>
+        <DropdownMenuItem className="text-red-600"><Trash2 className="w-4 h-4 mr-2" /> Delete</DropdownMenuItem>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
+  const PostCard = ({ post }: { post: PostData }) => {
+    const savedUserStr = localStorage.getItem('user');
+    const currentUserId = savedUserStr ? JSON.parse(savedUserStr)._id || JSON.parse(savedUserStr).id : 'guest';
+    const likedList = post.likedUserIds || [];
+    const isLikedInitial = Array.isArray(likedList)
+      ? likedList.includes(currentUserId)
+      : typeof likedList === 'string' && (likedList as string).includes(currentUserId);
+    const [localLikes, setLocalLikes] = useState(post.likes);
+    const [isLiked, setIsLiked] = useState(isLikedInitial);
+
+    const handleLike = async () => {
+      // 1. Cập nhật UI ngay lập tức cho mượt
+      const newIsLiked = !isLiked;
+      setIsLiked(newIsLiked);
+      setLocalLikes(newIsLiked ? localLikes + 1 : localLikes - 1);
+
+      // 2. Gọi API ngầm
+      try {
+        const res = await fetch(`http://localhost:8080/api/community/${post.id}/like`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+        });
+        if (res.status === 401) {
+          alert("Bạn cần đăng nhập để thả tim!");
+          setIsLiked(!newIsLiked);
+          setLocalLikes(localLikes);
+        }
+      } catch (error) {
+        console.error("Like error", error);
+        setIsLiked(!newIsLiked);
+        setLocalLikes(localLikes);
+      }
+    };
+
+    return (
+      <Card className="p-4 sm:p-6 hover:shadow-lg transition-all duration-300">
         {/* Author Info */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
@@ -256,87 +471,62 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
                 <Badge variant="secondary" className="text-xs">{post.type.toUpperCase()}</Badge>
               </div>
               <div className="text-sm text-muted-foreground">
-                {new Date(post.createdAt).toLocaleDateString()}
+                {formatTimeAgo(post.createdAt)}
               </div>
             </div>
           </div>
         </div>
 
         {/* Content */}
-        <p className="mb-3 text-foreground leading-relaxed whitespace-pre-wrap">{post.content}</p>
+        <p className="mb-3 text-sm sm:text-base text-foreground leading-relaxed whitespace-pre-wrap">{post.content}</p>
 
         {/* --- PHẦN IMAGE (Hiển thị nếu có) --- */}
-                {post.image && (
-                    <div className="mb-4 rounded-2xl overflow-hidden">
-                    <img
-                        src={post.image}
-                        alt="Post"
-                        className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
-                        onError={(e) => {
-                            // Fallback nếu ảnh lỗi
-                            (e.target as HTMLImageElement).style.display = 'none';
-                        }}
-                    />
-                    </div>
-                )}
-
-        {/* Poll */}
-        {post.poll && (
-          <div className="mb-4 p-4 bg-muted/50 rounded-2xl border border-gray-100">
-            <h5 className="font-semibold mb-3">{post.poll.question}</h5>
-            <div className="space-y-2">
-              {post.poll.options.map((option) => (
-                <button
-                  key={option.id}
-                  className="w-full text-left p-3 rounded-xl bg-white border border-gray-200 hover:border-primary transition-all relative overflow-hidden"
-                  >
-                  <div className="flex items-center justify-between mb-1 relative z-10">
-                    <span className="font-medium">{option.text}</span>
-                    <span className="text-sm font-bold">{option.percentage}%</span>
-                  </div>
-                  <Progress value={option.percentage} className="h-1.5" />
-                </button>
-              ))}
-            </div>
-            <p className="text-sm text-muted-foreground mt-3 text-center">
-              {post.poll.totalVotes} votes
-            </p>
+        {post.image && (
+          <div className="mb-4 rounded-2xl overflow-hidden">
+            <img
+              src={post.image}
+              alt="Post"
+              className="w-full h-48 sm:h-64 object-cover hover:scale-105 transition-transform duration-300"
+              onError={(e) => {
+                // Fallback nếu ảnh lỗi
+                (e.target as HTMLImageElement).style.display = 'none';
+              }}
+            />
           </div>
         )}
 
+        <PollComponent post={post} />
         {/* Tags */}
         {post.tags && post.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-4">
-                        {post.tags.map((tag: string, idx: number) => (
-                        <Badge
-                            key={idx}
-                            variant="outline"
-                            className="cursor-pointer hover:bg-primary hover:text-white hover:border-primary transition-all text-xs"
-                        >
-                            {tag.startsWith('#') ? tag : `#${tag}`}
-                        </Badge>
-                        ))}
-                    </div>
-                )}
+          <div className="flex flex-wrap gap-2 mb-4">
+            {post.tags.map((tag: string, idx: number) => (
+              <Badge
+                key={idx}
+                variant="outline"
+                className="cursor-pointer hover:bg-primary hover:text-white hover:border-primary transition-all text-xs"
+              >
+                {tag.startsWith('#') ? tag : `#${tag}`}
+              </Badge>
+            ))}
+          </div>
+        )}
 
         {/* Actions */}
-        <div className="flex items-center gap-6 pt-4 border-t border-border">
+        <div className="flex items-center gap-4 sm:gap-6 pt-3 sm:pt-4 border-t border-border">
           <button
             onClick={handleLike}
-            className={`flex items-center gap-2 transition-all hover:scale-110 ${
-              isLiked ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'
-            }`}
+            className={`flex items-center gap-1.5 sm:gap-2 transition-all hover:scale-110 min-h-10 ${isLiked ? 'text-red-500' : 'text-muted-foreground hover:text-red-500'
+              }`}
           >
             <Heart className={`w-5 h-5 ${isLiked ? 'fill-red-500' : ''}`} />
-            <span className="font-medium">{localLikes}</span>
+            <span className="font-medium text-sm sm:text-base">{localLikes}</span>
           </button>
 
-          <button className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-all hover:scale-110">
+          <button onClick={() => openPostDetail(post)} className="flex items-center gap-1.5 sm:gap-2 text-muted-foreground hover:text-blue-500 hover:scale-110 transition-all min-h-10">
             <MessageCircle className="w-5 h-5" />
-            <span className="font-medium">{post.comments}</span>
+            <span className="font-medium text-sm sm:text-base">{post.comments}</span>
           </button>
-
-          <button className="flex items-center gap-2 text-muted-foreground hover:text-primary transition-all hover:scale-110 ml-auto">
+          <button onClick={() => handleShare(post)} className="flex items-center gap-1.5 sm:gap-2 text-muted-foreground hover:text-primary ml-auto min-h-10">
             <Share2 className="w-5 h-5" />
           </button>
         </div>
@@ -356,31 +546,33 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
       {/* Header */}
       <div className="sticky top-0 z-40 bg-white/95 backdrop-blur-xl border-b border-border">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center gap-3 mb-4">
+          <div className="flex items-center gap-3 sm:gap-4 mb-3 sm:mb-4">
             <button
               onClick={() => onNavigate('home')}
-              className="p-2 hover:bg-muted rounded-full transition-all hover:scale-110"
+              className="p-1.5 sm:p-2 hover:bg-muted rounded-full transition-all hover:scale-110"
             >
-              <ArrowLeft className="w-6 h-6" />
+              <ArrowLeft className="w-5 h-5 sm:w-6 sm:h-6" />
             </button>
             <div className="flex-1">
-              <h1 className="text-xl font-bold">Community Hub</h1>
-              <p className="text-sm text-muted-foreground">Share, Learn, Connect</p>
+              <h1 className="text-lg sm:text-xl font-bold">Community Hub</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground">Share, Learn, Connect</p>
             </div>
           </div>
 
           {/* Search */}
           <div className="relative">
-            <Search className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-muted-foreground" />
+            <Search className="absolute left-3 sm:left-4 top-1/2 -translate-y-1/2 w-4 h-4 sm:w-5 sm:h-5 text-muted-foreground" />
             <Input
-              placeholder="Search discussions, recipes, tips..."
-              className="pl-12 h-12 rounded-2xl bg-muted/50 border-0"
+              placeholder="Search discussions, tags (#recipe)..."
+              className="pl-10 sm:pl-12 h-10 sm:h-12 text-sm sm:text-base rounded-2xl bg-muted/50 border-0"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
             />
           </div>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
+      <div className="max-w-7xl mx-auto px-3 sm:px-4 py-4 sm:py-6">
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Feed */}
           <div className="lg:col-span-2 space-y-6">
@@ -392,20 +584,20 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
               </div>
 
               <ScrollArea className="w-full">
-                <div className="flex gap-2 pb-2">
+                <div className="flex gap-2 pb-2 overflow-x-auto">
                   {hotTopics.map((topic) => (
                     <button
                       key={topic.id}
-                      className="flex-shrink-0 px-4 py-2 rounded-full bg-gradient-to-r from-primary/10 to-orange-100 hover:from-primary hover:to-orange-500 hover:text-white border border-primary/20 transition-all hover:scale-105 group"
+                      className="flex-shrink-0 px-3 sm:px-4 py-1.5 sm:py-2 rounded-full bg-gradient-to-r from-primary/10 to-orange-100 hover:from-primary hover:to-orange-500 hover:text-white border border-primary/20 transition-all hover:scale-105 group"
                     >
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-1.5 sm:gap-2">
                         {topic.trending && (
-                          <span className="text-sm">🔥</span>
+                          <span className="text-xs sm:text-sm">🔥</span>
                         )}
-                        <span className="font-medium text-sm">{topic.tag}</span>
+                        <span className="font-medium text-xs sm:text-sm">{topic.tag}</span>
                         <Badge
                           variant="outline"
-                          className="text-xs bg-white/50 group-hover:bg-white/90"
+                          className="text-[10px] sm:text-xs bg-white/50 group-hover:bg-white/90"
                         >
                           {(topic.count / 1000).toFixed(1)}k
                         </Badge>
@@ -416,11 +608,11 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
               </ScrollArea>
             </div>
 
-            {/* RICH POST COMPOSER - Replace simple FAB */}
-            <Card className="p-4 bg-gradient-to-br from-primary/5 via-orange-50/50 to-yellow-50/30 border-2 border-primary/20 shadow-lg hover:shadow-xl transition-all">
-              <div className="flex gap-3">
+            {/* RICH POST COMPOSER - Hide on mobile, show on tablet+ */}
+            <Card className="hidden sm:block p-3 sm:p-4 bg-gradient-to-br from-primary/5 via-orange-50/50 to-yellow-50/30 border-2 border-primary/20 shadow-lg hover:shadow-xl transition-all">
+              <div className="flex gap-2 sm:gap-3">
                 {/* User Avatar */}
-                <Avatar className="w-12 h-12 border-2 border-primary flex-shrink-0">
+                <Avatar className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-primary flex-shrink-0">
                   <div className="bg-gradient-to-br from-primary to-orange-500 text-white flex items-center justify-center h-full w-full font-bold">
                     {currentUser.avatar}
                   </div>
@@ -428,7 +620,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
 
                 {/* Input Area */}
                 <div className="flex-1">
-                  <button 
+                  <button
                     className="w-full text-left px-4 py-3 bg-white border-2 border-border hover:border-primary rounded-2xl transition-all hover:shadow-md"
                     onClick={() => setShowCreateModal(true)}
                   >
@@ -438,23 +630,23 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
                   </button>
 
                   {/* Action Buttons */}
-                  <div className="flex gap-2 mt-3">
-                    <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-blue-50 border border-border hover:border-blue-300 rounded-xl transition-all hover:scale-105 group"
-                    onClick={() => setShowCreateModal(true)}>
-                      <Camera className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform" />
-                      <span className="text-sm font-medium text-gray-700 group-hover:text-blue-700">Photo</span>
+                  <div className="flex gap-2 mt-3 flex-wrap">
+                    <button className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-white hover:bg-blue-50 border border-border hover:border-blue-300 rounded-xl transition-all hover:scale-105 group min-w-0"
+                      onClick={() => setShowCreateModal(true)}>
+                      <Camera className="w-4 h-4 text-blue-600 group-hover:scale-110 transition-transform flex-shrink-0" />
+                      <span className="text-xs sm:text-sm font-medium text-gray-700 group-hover:text-blue-700 truncate">Photo</span>
                     </button>
 
-                    <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-red-50 border border-border hover:border-red-300 rounded-xl transition-all hover:scale-105 group"
-                    onClick={() => setShowCreateModal(true)}>
-                      <Video className="w-4 h-4 text-red-600 group-hover:scale-110 transition-transform" />
-                      <span className="text-sm font-medium text-gray-700 group-hover:text-red-700">Video</span>
+                    <button className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-white hover:bg-red-50 border border-border hover:border-red-300 rounded-xl transition-all hover:scale-105 group min-w-0"
+                      onClick={() => setShowCreateModal(true)}>
+                      <Video className="w-4 h-4 text-red-600 group-hover:scale-110 transition-transform flex-shrink-0" />
+                      <span className="text-xs sm:text-sm font-medium text-gray-700 group-hover:text-red-700 truncate">Video</span>
                     </button>
 
-                    <button className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-white hover:bg-orange-50 border border-border hover:border-primary rounded-xl transition-all hover:scale-105 group"
-                    onClick={() => setShowCreateModal(true)}>
-                      <UtensilsCrossed className="w-4 h-4 text-primary group-hover:scale-110 transition-transform" />
-                      <span className="text-sm font-medium text-gray-700 group-hover:text-primary">Recipe</span>
+                    <button className="flex-1 flex items-center justify-center gap-1.5 sm:gap-2 px-3 sm:px-4 py-2 sm:py-2.5 bg-white hover:bg-orange-50 border border-border hover:border-primary rounded-xl transition-all hover:scale-105 group min-w-0"
+                      onClick={() => setShowCreateModal(true)}>
+                      <UtensilsCrossed className="w-4 h-4 text-primary group-hover:scale-110 transition-transform flex-shrink-0" />
+                      <span className="text-xs sm:text-sm font-medium text-gray-700 group-hover:text-primary truncate">Recipe</span>
                     </button>
                   </div>
                 </div>
@@ -464,26 +656,28 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
             {/* Filter Tabs */}
             <Tabs value={selectedTab} onValueChange={setSelectedTab}>
               <TabsList className="grid w-full grid-cols-4 bg-muted/30">
-                <TabsTrigger value="all" className="rounded-xl">All Posts</TabsTrigger>
-                <TabsTrigger value="questions" className="rounded-xl">Questions</TabsTrigger>
-                <TabsTrigger value="polls" className="rounded-xl">Polls</TabsTrigger>
-                <TabsTrigger value="tips" className="rounded-xl">Tips</TabsTrigger>
+                <TabsTrigger value="all" className="rounded-xl">All</TabsTrigger>
+                <TabsTrigger value="question" className="rounded-xl">Questions</TabsTrigger>
+                <TabsTrigger value="poll" className="rounded-xl">Polls</TabsTrigger>
+                <TabsTrigger value="tip" className="rounded-xl">Tips</TabsTrigger>
               </TabsList>
             </Tabs>
 
             {/* Posts Feed */}
             <div className="space-y-4">
-              {posts.filter(p => selectedTab === 'all' || p.type === selectedTab)
-                .map(post => <PostCard key={post.id} post={post} />)
-                }
-              {posts.length === 0 && (
-                <div className="text-center py-10 text-gray-500">No posts yet. Be the first to share!</div>
+              {filteredPosts.length > 0 ? (
+                filteredPosts.map(post => <PostCard key={post.id} post={post} />)
+              ) : (
+                <div className="text-center py-10 text-gray-500">
+                  <p>No posts found matching your criteria.</p>
+                  <Button variant="link" onClick={() => { setSelectedTab('all'); setSearchQuery(''); }}>Clear filters</Button>
+                </div>
               )}
             </div>
           </div>
 
           {/* Sidebar */}
-          <div className="space-y-6">
+          <div className="space-y-6 hidden lg:block">
             {/* Top Contributors Leaderboard */}
             <Card className="p-6 sticky top-24">
               <div className="flex items-center gap-2 mb-4">
@@ -563,98 +757,245 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
       </div>
 
       {/* MOBILE FLOATING ACTION BUTTON (FAB) with expandable label */}
-      {/* Only visible on mobile (lg:hidden) */}
-      <button onClick={() => setShowCreateModal(true)} className={`fixed bottom-20 right-4 z-50 lg:hidden bg-primary text-white shadow-2xl rounded-full transition-all ${showFABLabel ? 'px-6 py-4' : 'p-4'}`}>
-              <div className="flex items-center gap-3">
-                <Plus className="w-6 h-6 flex-shrink-0" />
-                <span className={`font-semibold whitespace-nowrap overflow-hidden transition-all ${showFABLabel ? 'max-w-[120px] opacity-100' : 'max-w-0 opacity-0'}`}>New Post</span>
-              </div>
-            </button>
+      {/* FAB - Always visible on mobile, show on scroll down. Positioned higher for mobile navigation */}
+      <button onClick={() => setShowCreateModal(true)} className={`fixed bottom-6 right-4 sm:bottom-20 sm:right-6 z-50 sm:hidden bg-primary text-white shadow-2xl rounded-full transition-all ${showFABLabel ? 'px-4 sm:px-6 py-3 sm:py-4' : 'p-3 sm:p-4'}`}>
+        <div className="flex items-center gap-2 sm:gap-3">
+          <Plus className="w-5 h-5 sm:w-6 sm:h-6 flex-shrink-0" />
+          <span className={`font-semibold text-sm sm:text-base whitespace-nowrap overflow-hidden transition-all ${showFABLabel ? 'max-w-[100px] sm:max-w-[120px] opacity-100' : 'max-w-0 opacity-0'}`}>New Post</span>
+        </div>
+      </button>
 
       <Dialog open={showCreateModal} onOpenChange={setShowCreateModal}>
-              <DialogContent className="sm:max-w-[500px]">
-                <DialogHeader>
-                  <DialogTitle>Create New Post</DialogTitle>
-                </DialogHeader>
+        <DialogContent className="w-full h-full sm:w-auto sm:h-auto sm:max-w-lg max-h-screen sm:max-h-[85vh] overflow-y-auto p-4 sm:p-6">
+          <DialogHeader>
+            <DialogTitle>Create New Post</DialogTitle>
+          </DialogHeader>
 
-                <Tabs value={newPostType} onValueChange={setNewPostType} className="w-full">
-                  <TabsList className="grid w-full grid-cols-3 mb-4">
-                    <TabsTrigger value="post">Post</TabsTrigger>
-                    <TabsTrigger value="question">Question</TabsTrigger>
-                    <TabsTrigger value="poll">Poll</TabsTrigger>
-                  </TabsList>
+          <Tabs value={createMode} onValueChange={setCreateMode} className="w-full">
+            <TabsList className="grid w-full grid-cols-3 mb-4">
+              <TabsTrigger value="general">Post / Question / Tip</TabsTrigger>
+              <TabsTrigger value="poll">Poll</TabsTrigger>
+            </TabsList>
 
-                  {newPostType !== 'poll' ? (
-                    <div className="space-y-4">
-                      <Textarea
-                        placeholder={`Share your ${newPostType}...`}
-                        value={newPostContent}
-                        onChange={(e) => setNewPostContent(e.target.value)}
-                        className="min-h-[100px]"
-                      />
+            {createMode === 'general' ? (
+              <div className="space-y-4">
+                <div className="flex gap-2 p-1 bg-muted/50 rounded-lg w-fit">
+                  <button
+                    onClick={() => setSelectedGeneralType('post')}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${selectedGeneralType === 'post' ? 'bg-white shadow-sm text-primary' : 'text-gray-500 hover:text-gray-900'}`}
+                  >
+                    <div className="flex items-center gap-1"><FileText className="w-3.5 h-3.5" /> Post</div>
+                  </button>
+                  <button
+                    onClick={() => setSelectedGeneralType('question')}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${selectedGeneralType === 'question' ? 'bg-white shadow-sm text-red-500' : 'text-gray-500 hover:text-gray-900'}`}
+                  >
+                    <div className="flex items-center gap-1"><HelpCircle className="w-3.5 h-3.5" /> Question</div>
+                  </button>
+                  <button
+                    onClick={() => setSelectedGeneralType('tip')}
+                    className={`px-3 py-1.5 rounded-md text-sm font-medium transition-all ${selectedGeneralType === 'tip' ? 'bg-white shadow-sm text-yellow-600' : 'text-gray-500 hover:text-gray-900'}`}
+                  >
+                    <div className="flex items-center gap-1"><Lightbulb className="w-3.5 h-3.5" /> Tip</div>
+                  </button>
+                </div>
 
-                      <div>
-                        <Label className="text-xs text-gray-500 mb-1 block">Image URL (Optional)</Label>
-                          <div className="flex gap-2">
-                            <Input
-                              placeholder="https://..."
-                              value={imageUrl}
-                              onChange={(e) => setImageUrl(e.target.value)}
-                            />
-                          </div>
-                      </div>
+                <Textarea
+                  placeholder={selectedGeneralType === 'question' ? "Ask the community something..." : selectedGeneralType === 'tip' ? "Share your secret cooking hack..." : "What's delicious today?"}
+                  value={newPostContent}
+                  onChange={(e) => setNewPostContent(e.target.value)}
+                  className="min-h-[120px] text-base resize-none"
+                />
 
-                      <div>
-                        <Label className="text-xs text-gray-500 mb-1 block">Tags (comma separated)</Label>
-                        <Input
-                          placeholder="e.g. #Healthy, #Breakfast"
-                          value={tagsInput}
-                          onChange={(e) => setTagsInput(e.target.value)}
-                        />
-                      </div>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      <div>
-                        <Label>Question</Label>
-                        <Input
-                          placeholder="Ask something..."
-                          value={pollQuestion}
-                          onChange={(e) => setPollQuestion(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-2">
-                        <Label>Options</Label>
-                        {pollOptions.map((opt, idx) => (
-                          <Input
-                            key={idx}
-                            placeholder={`Option ${idx + 1}`}
-                            value={opt}
-                            onChange={(e) => {
-                              const newOpts = [...pollOptions];
-                              newOpts[idx] = e.target.value;
-                              setPollOptions(newOpts);
-                            }}
+                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
+                  <div>
+                    <div>
+                      <Label className="text-xs text-gray-500 mb-1 block">Image (Optional)</Label>
+                      {imageUrl ? (
+                        <div className="relative mt-2">
+                          <img src={imageUrl} alt="Preview" className="w-full h-48 object-cover rounded-md" />
+                          <button
+                            onClick={() => setImageUrl('')}
+                            className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full"
+                          >
+                            <X className="w-4 h-4" />
+                          </button>
+                        </div>
+                      ) : (
+                        <div className="flex items-center gap-2 mt-1">
+                          <label htmlFor="image-upload" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 rounded-md transition-all text-sm font-medium w-full justify-center border border-dashed border-gray-300">
+                            <ImageIcon className="w-4 h-4" />
+                            {isUploading ? "Uploading..." : "Upload Image"}
+                          </label>
+                          <input
+                            id="image-upload"
+                            type="file"
+                            accept="image/*"
+                            className="hidden"
+                            onChange={handleImageUpload}
+                            disabled={isUploading}
                           />
-                        ))}
-                        <Button
-                          type="button" variant="outline" size="sm"
-                          onClick={() => setPollOptions([...pollOptions, ''])}
-                        >
-                          + Add Option
-                        </Button>
+                          {isUploading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  <div>
+                    <Label className="text-xs text-gray-500 mb-1 block">Tags (comma separated)</Label>
+                    <Input
+                      placeholder="e.g. #Healthy, #Breakfast"
+                      value={tagsInput}
+                      onChange={(e) => setTagsInput(e.target.value)}
+                    />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div>
+                  <Label>Your Question</Label>
+                  <Input
+                    placeholder="e.g. Pho vs Bun Bo Hue?"
+                    value={pollQuestion}
+                    onChange={(e) => setPollQuestion(e.target.value)}
+                    className="text-lg font-medium mt-1"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Options</Label>
+                  {pollOptions.map((opt, idx) => (
+                    <div key={idx} className="flex gap-2">
+                      <Input
+                        placeholder={`Option ${idx + 1}`}
+                        value={opt}
+                        onChange={(e) => {
+                          const newOpts = [...pollOptions];
+                          newOpts[idx] = e.target.value;
+                          setPollOptions(newOpts);
+                        }}
+                      />
+                      {pollOptions.length > 2 && (
+                        <Button variant="ghost" size="icon" onClick={() => {
+                          const newOpts = pollOptions.filter((_, i) => i !== idx);
+                          setPollOptions(newOpts);
+                        }}><span className="text-red-500">×</span></Button>
+                      )}
+                    </div>
+                  ))}
+                  <Button type="button" variant="outline" size="sm" onClick={() => setPollOptions([...pollOptions, ''])} className="w-full border-dashed">
+                    + Add Option
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            <div className="flex flex-col sm:flex-row justify-end mt-6 gap-2">
+              <Button variant="ghost" onClick={() => setShowCreateModal(false)} className="w-full sm:w-auto">Cancel</Button>
+              <Button onClick={handleCreatePost} disabled={isSubmitting} className="w-full sm:w-auto bg-primary hover:bg-orange-600 text-white min-w-[100px]">
+                {isSubmitting ? 'Posting...' : 'Post'}
+              </Button>
+            </div>
+          </Tabs>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={!!selectedPost} onOpenChange={(open: boolean) => !open && setSelectedPost(null)}>
+        <DialogContent className="w-full h-full sm:w-auto sm:h-auto sm:max-w-lg max-h-[90vh] flex flex-col p-0 gap-0 overflow-hidden bg-white">
+          <DialogTitle className="sr-only">Post Detail</DialogTitle>
+          {selectedPost && (
+            <>
+              {/* Header: Author Info */}
+              <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-white z-10">
+                <div className="flex items-center gap-3">
+                  <Avatar><div className="bg-primary text-white flex items-center justify-center w-full h-full font-bold">{selectedPost.authorAvatar}</div></Avatar>
+                  <div><h4 className="font-semibold text-sm sm:text-base">{selectedPost.authorName}</h4><div className="text-[10px] sm:text-xs text-muted-foreground">{formatTimeAgo(selectedPost.createdAt)}</div></div>
+                </div>
+                <PostOptions />
+              </div>
+
+              {/* Scrollable Content */}
+              <div className="flex-1 overflow-y-auto p-3 sm:p-4 custom-scrollbar">
+                <p className="mb-3 sm:mb-4 text-base sm:text-lg">{selectedPost.content}</p>
+                {selectedPost.image && (
+                  <div className="w-full mb-4 max-h-[400px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
+                    <img
+                      src={selectedPost.image}
+                      alt="Post Detail"
+                      className="w-full h-auto max-h-[400px] object-contain rounded-lg"
+                    />
+                  </div>
+                )}
+                <PollComponent post={selectedPost} />
+
+                <div className="h-px bg-border my-6" />
+
+                {/* Comments List */}
+                <h3 className="font-bold text-sm sm:text-base mb-3 sm:mb-4">Comments ({postComments.length})</h3>
+                <div className="space-y-6">
+                  {postComments.map(comment => (
+                    <div key={comment.id} className="flex gap-3">
+                      <Avatar className="w-7 h-7 sm:w-8 sm:h-8"><div className="bg-gray-200 text-gray-600 flex items-center justify-center w-full h-full text-xs font-bold">{comment.authorAvatar}</div></Avatar>
+                      <div className="flex-1">
+                        <div className="bg-muted/50 p-3 rounded-2xl rounded-tl-none">
+                          <div className="flex justify-between items-start">
+                            <span className="font-semibold text-sm">{comment.authorName}</span>
+                            <PostOptions />
+                          </div>
+                          <p className="text-sm mt-1">{comment.content}</p>
+                        </div>
+                        <div className="flex gap-4 mt-1 ml-2 text-xs text-muted-foreground font-medium">
+                          <button className="hover:text-primary">Like</button>
+                          <button className="hover:text-primary" onClick={() => setReplyingTo(comment.id)}>Reply</button>
+                          <span>{formatTimeAgo(comment.createdAt)}</span>
+                        </div>
+
+                        {/* Replies (Nested) */}
+                        {comment.replies && comment.replies.length > 0 && (
+                          <div className="mt-3 space-y-3 pl-3 border-l-2 border-border ml-2">
+                            {comment.replies.map(reply => (
+                              <div key={reply.id} className="flex gap-3">
+                                <Avatar className="w-6 h-6"><div className="bg-gray-200 w-full h-full flex items-center justify-center text-[10px]">{reply.authorAvatar}</div></Avatar>
+                                <div>
+                                  <div className="bg-muted/30 p-2 rounded-xl">
+                                    <span className="font-semibold text-xs">{reply.authorName}</span>
+                                    <p className="text-xs">{reply.content}</p>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     </div>
-                  )}
+                  ))}
+                </div>
+              </div>
 
-                  <div className="flex justify-end mt-6 gap-2">
-                    <Button variant="ghost" onClick={() => setShowCreateModal(false)}>Cancel</Button>
-                    <Button onClick={handleCreatePost} disabled={isSubmitting}>
-                      {isSubmitting ? 'Posting...' : 'Post'}
-                    </Button>
+              {/* Footer: Input Comment (Sticky Bottom) */}
+              <div className="p-3 sm:p-4 border-t bg-white">
+                {replyingTo && (
+                  <div className="flex justify-between items-center text-xs text-blue-600 mb-2 bg-blue-50 p-2 rounded">
+                    <span>Replying to comment...</span>
+                    <button onClick={() => setReplyingTo(null)} className="font-bold">Cancel</button>
                   </div>
-                </Tabs>
-              </DialogContent>
+                )}
+                <div className="flex gap-2">
+                  <Input
+                    placeholder="Write a comment..."
+                    value={newCommentContent}
+                    onChange={(e) => setNewCommentContent(e.target.value)}
+                    className="flex-1 rounded-full bg-muted/50 border-0"
+                    onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
+                  />
+                  <Button size="icon" className="rounded-full" onClick={handleSendComment}>
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
       </Dialog>
     </div>
   );
