@@ -7,7 +7,7 @@ import {
     ShoppingCart, Package, Star, Filter, ChevronDown,
     Upload, Video, FileText, Zap, Globe, Lock, Users,
     BarChart3, Target, TrendingDown, Sparkles, ArrowUpDown, X, Activity,
-    UtensilsCrossed, MapPin, Tag
+    UtensilsCrossed, MapPin, Tag, Youtube
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from './ui/card';
@@ -20,7 +20,14 @@ import { Separator } from './ui/separator';
 
 // --- DANH SÁCH LỰA CHỌN ---
 const DIETARY_TYPES = ['Mặn', 'Chay', 'Bánh ngọt', 'Đồ uống', 'Eat Clean/Healthy', 'Không Gluten', 'Low Carb'];
-const CUISINES = ['Việt Nam', 'Hàn Quốc', 'Nhật Bản', 'Trung Quốc', 'Thái Lan', 'Âu Mỹ', 'Ý', 'Khác'];
+const MEAL_COURSES = ['Sáng', 'Trưa', 'Tối', 'Ăn vặt (Snack)', 'Tráng miệng', 'Khai vị'];
+const KITCHEN_TOOLS = ['Nồi chiên không dầu', 'Lò nướng', 'Máy xay sinh tố', 'Chảo chống dính', 'Nồi áp suất', 'Slow Cooker'];
+const ALLERGENS = ['Đậu phộng', 'Hải sản/Tôm cua', 'Sữa (Lactose)', 'Gluten', 'Trứng', 'Đậu nành', 'Các loại hạt'];
+const UNITS = ['g', 'kg', 'ml', 'l', 'thìa cafe (tsp)', 'muỗng canh (tbsp)', 'cup', 'bát/chén', 'quả/trái', 'củ', 'lát', 'nhúm', 'cái/chiếc'];
+const CUISINES = [
+    'Việt Nam', 'Hàn Quốc', 'Nhật Bản', 'Trung Quốc', 'Thái Lan', 'Mỹ', 'Ý', 'Pháp', 'Ấn Độ',
+    'Mexico', 'Tây Ban Nha', 'Đức', 'Nga', 'Hy Lạp', 'Thổ Nhĩ Kỳ', 'Indonesia', 'Malaysia', 'Singapore'
+];
 
 // --- MOCK DATA ---
 const ENHANCED_HISTORY = [
@@ -111,12 +118,25 @@ function EnhancedCreateRecipeForm() {
     // 1. STATES
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
+    const [prepTime, setPrepTime] = useState(''); // NEW
     const [cookTime, setCookTime] = useState('');
     const [servings, setServings] = useState('');
+    const [recipeLevel, setRecipeLevel] = useState(1);
 
-    // --- STATE MỚI ---
+    // Metadata
     const [selectedDietary, setSelectedDietary] = useState<string[]>([]);
-    const [selectedCuisine, setSelectedCuisine] = useState(CUISINES[0]);
+    const [selectedMealCourse, setSelectedMealCourse] = useState<string[]>([]); // NEW
+    const [selectedCuisine, setSelectedCuisine] = useState(CUISINES[0]); // Default first
+    const [selectedKitchenTools, setSelectedKitchenTools] = useState<string[]>([]); // NEW
+    const [selectedAllergens, setSelectedAllergens] = useState<string[]>([]); // NEW
+    const [storageInstruction, setStorageInstruction] = useState(''); // NEW
+    const [chefTips, setChefTips] = useState(''); // NEW
+
+    // Video
+    const [isVideoModalOpen, setIsVideoModalOpen] = useState(false);
+    const [videoType, setVideoType] = useState<'YOUTUBE' | 'UPLOAD'>('YOUTUBE');
+    const [videoUrl, setVideoUrl] = useState('');
+    const [videoFile, setVideoFile] = useState<File | null>(null);
 
     const [nutrition, setNutrition] = useState({ calories: '', carb: '', protein: '', fat: '' });
     const [mainImageFile, setMainImageFile] = useState<File | null>(null);
@@ -127,7 +147,6 @@ function EnhancedCreateRecipeForm() {
     const subInputRef = useRef<HTMLInputElement>(null);
     const [ingredients, setIngredients] = useState([{ id: 1, name: '', quantity: '', unit: '', price: '' }]);
     const [steps, setSteps] = useState([{ id: Date.now(), content: '' }]);
-    const [recipeLevel, setRecipeLevel] = useState(1);
     const [isPremium, setIsPremium] = useState(false);
     const [visibility, setVisibility] = useState('public');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -145,25 +164,26 @@ function EnhancedCreateRecipeForm() {
             setSubImagePreviews([...subImagePreviews, URL.createObjectURL(file)]);
         }
         if (e.target) e.target.value = '';
-    };
+    }
     const removeSubImage = (index: number) => {
         setSubImageFiles(subImageFiles.filter((_, i) => i !== index));
         setSubImagePreviews(subImagePreviews.filter((_, i) => i !== index));
     };
+
+    // Helper needed for RecipeManager component
+    const toggleList = (list: string[], setList: any, item: string) => {
+        if (list.includes(item)) setList(list.filter((i: string) => i !== item));
+        else setList([...list, item]);
+    };
+
+    const toggleDietary = (type: string) => toggleList(selectedDietary, setSelectedDietary, type);
+
     const handleIngredientChange = (id: number, field: string, value: string) => setIngredients(ingredients.map(item => item.id === id ? { ...item, [field]: value } : item));
     const addIngredientRow = () => setIngredients([...ingredients, { id: Date.now(), name: '', quantity: '', unit: '', price: '' }]);
     const removeIngredientRow = (id: number) => ingredients.length > 1 && setIngredients(ingredients.filter(item => item.id !== id));
 
-    // --- LOGIC CHỌN NHIỀU DIETARY ---
-    const toggleDietary = (type: string) => {
-        if (selectedDietary.includes(type)) {
-            setSelectedDietary(selectedDietary.filter(item => item !== type));
-        } else {
-            setSelectedDietary([...selectedDietary, type]);
-        }
-    };
-
-    const totalCost = ingredients.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0);
+    // Tính toán chi phí (Input là nghìn đồng -> Hiển thị * 1000)
+    const totalCost = ingredients.reduce((sum, item) => sum + (parseFloat(item.price) || 0), 0) * 1000;
     const commission = totalCost * 0.15;
 
     // 3. SUBMIT
@@ -174,42 +194,67 @@ function EnhancedCreateRecipeForm() {
         setIsSubmitting(true);
         try {
             const formData = new FormData();
+
+            // Xử lý ingredients: Chuyển đổi giá nghìn -> đồng
+            const processedIngredients = ingredients.map(ing => ({
+                ...ing,
+                price: (parseFloat(ing.price) || 0) * 1000 // Convert 8 -> 8000
+            }));
+
             const recipeData = {
                 title, description,
                 cookTime: parseInt(cookTime) || 0,
+                prepTime: parseInt(prepTime) || 0,
                 servings: parseInt(servings) || 0,
-                difficulty: ['Dễ', 'Vừa', 'Khó'][recipeLevel - 1],
+                difficulty: recipeLevel === 1 ? 'Dễ' : recipeLevel === 2 ? 'Vừa' : 'Khó',
 
                 dietaryType: selectedDietary,
+                mealCourse: selectedMealCourse,
                 cuisine: selectedCuisine,
+                kitchenTools: selectedKitchenTools,
+                allergens: selectedAllergens,
+                storageInstruction,
+                chefTips,
 
-                ingredients: ingredients.map(ing => ({ name: ing.name, quantity: ing.quantity, unit: ing.unit, price: parseFloat(ing.price) || 0 })),
-                steps: steps.map((step, idx) => ({ stepNumber: idx + 1, content: step.content })),
-                nutrition: { calories: parseInt(nutrition.calories) || 0, carb: parseInt(nutrition.carb) || 0, protein: parseInt(nutrition.protein) || 0, fat: parseInt(nutrition.fat) || 0 },
-                totalCost, estimatedCommission: commission, premium: isPremium, visibility
+                // Video data
+                videoType,
+                videoUrl: videoType === 'YOUTUBE' ? videoUrl : '',
+                // Note: videoFile handled via separate upload or logic if needed
+
+                nutrition: {
+                    calories: parseInt(nutrition.calories) || 0,
+                    carb: parseInt(nutrition.carb) || 0,
+                    protein: parseInt(nutrition.protein) || 0,
+                    fat: parseInt(nutrition.fat) || 0
+                },
+                ingredients: processedIngredients, // Use processed ingredients
+                steps: steps.map((s, i) => ({ stepNumber: i + 1, content: s.content })),
+
+                totalCost, // Calculated above
+                estimatedCommission: commission,
+                isPremium,
+                visibility
             };
 
             formData.append('data', JSON.stringify(recipeData));
-            formData.append('mainImage', mainImageFile);
-            subImageFiles.forEach((file) => formData.append('subImages', file));
+            if (mainImageFile) formData.append('mainImage', mainImageFile);
+            subImageFiles.forEach(file => formData.append('subImages', file));
 
-            const response = await fetch('http://localhost:8080/api/recipes/create', {
-                method: 'POST', credentials: 'include', body: formData
-            });
-
-            if (response.ok) {
-                alert('✅ Đăng công thức thành công!');
-                window.location.reload();
-            } else {
-                const errorText = await response.text();
-                alert('❌ Lỗi: ' + errorText);
-            }
-        } catch (error) { alert('❌ Không thể kết nối tới server.'); } finally { setIsSubmitting(false); }
+            const res = await fetch('http://localhost:8080/api/recipes/create', {
+                method: 'POST',
+                body: formData,
+                credentials: 'include' // Important for session
+            }); if (res.ok) { alert('✅ Đăng công thức thành công!'); window.location.reload(); }
+            else { const txt = await res.text(); alert('❌ Lỗi: ' + txt); }
+        } catch (error) { alert('❌ Lỗi kết nối'); } finally { setIsSubmitting(false); }
     };
 
     return (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
             <div className="lg:col-span-2 space-y-6">
+
+
+                {/* 2. THÔNG TIN CÔNG THỨC */}
                 <Card className="border-0 shadow-lg overflow-hidden">
                     <CardHeader className="border-b" style={{ backgroundColor: '#FF6B35' }}>
                         <CardTitle className="flex items-center gap-2 text-white"><Edit3 className="w-6 h-6 text-white" /> <span>Thông tin Công Thức</span></CardTitle>
@@ -220,8 +265,9 @@ function EnhancedCreateRecipeForm() {
                             <div><Label className="text-base font-semibold">Tên món ăn <Badge variant="outline" className="text-xs ml-2">Bắt buộc</Badge></Label><Input placeholder="Ví dụ: Bún Chả Hà Nội..." value={title} onChange={(e) => setTitle(e.target.value)} className="text-lg h-12 border-orange-200 focus:border-orange-400" /></div>
                             <div><Label className="text-base font-semibold">Mô tả hấp dẫn</Label><Textarea placeholder="Mô tả hương vị, điểm đặc biệt..." value={description} onChange={(e) => setDescription(e.target.value)} className="min-h-[100px] border-orange-200 focus:border-orange-400" /></div>
 
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                                <div><Label>Thời gian (phút)</Label><Input type="number" placeholder="30" value={cookTime} onChange={(e) => setCookTime(e.target.value)} className="border-orange-200" /></div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                <div><Label>Chuẩn bị (ph)</Label><Input type="number" value={prepTime} onChange={(e) => setPrepTime(e.target.value)} className="border-orange-200" /></div>
+                                <div><Label>Nấu (ph)</Label><Input type="number" value={cookTime} onChange={(e) => setCookTime(e.target.value)} className="border-orange-200" /></div>
                                 <div><Label>Khẩu phần</Label><Input type="number" placeholder="2" value={servings} onChange={(e) => setServings(e.target.value)} className="border-orange-200" /></div>
                                 <div>
                                     <Label>Độ khó</Label>
@@ -233,11 +279,61 @@ function EnhancedCreateRecipeForm() {
                                 </div>
                             </div>
 
-                            {/* --- GIAO DIỆN PHÂN LOẠI ĐÃ SỬA MÀU CAM --- */}
+                            {/* MEAL COURSE & CUISINE */}
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div>
+                                    <Label className="mb-2 block">Bữa ăn (Chọn nhiều)</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {MEAL_COURSES.map(c => (
+                                            <Badge key={c} variant={selectedMealCourse.includes(c) ? "default" : "outline"}
+                                                className="cursor-pointer" onClick={() => toggleList(selectedMealCourse, setSelectedMealCourse, c)}>{c}</Badge>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label className="mb-2 block">Ẩm thực Quốc gia</Label>
+                                    <select
+                                        className="w-full h-10 border border-gray-300 rounded-md px-3 bg-white"
+                                        value={selectedCuisine}
+                                        onChange={e => setSelectedCuisine(e.target.value)}
+                                    >
+                                        <option value="">Chọn ẩm thực...</option>
+                                        {CUISINES.map(c => <option key={c} value={c}>{c}</option>)}
+                                    </select>
+                                </div>
+                            </div>
+
+                            {/* KITCHEN TOOLS & ALLERGENS */}
+                            <div className="space-y-4">
+                                <div>
+                                    <Label className="mb-2 block">Dụng cụ cần thiết</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {KITCHEN_TOOLS.map(t => (
+                                            <div key={t} onClick={() => toggleList(selectedKitchenTools, setSelectedKitchenTools, t)}
+                                                className={`px-3 py-1 rounded-full text-xs border cursor-pointer ${selectedKitchenTools.includes(t) ? 'bg-blue-50 border-blue-500 text-blue-700' : 'bg-gray-50'}`}>
+                                                {t}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                                <div>
+                                    <Label className="mb-2 block text-red-600">⚠️ Cảnh báo Dị ứng</Label>
+                                    <div className="flex flex-wrap gap-2">
+                                        {ALLERGENS.map(a => (
+                                            <div key={a} onClick={() => toggleList(selectedAllergens, setSelectedAllergens, a)}
+                                                className={`px-3 py-1 rounded-full text-xs border cursor-pointer ${selectedAllergens.includes(a) ? 'bg-red-50 border-red-500 text-red-700' : 'bg-gray-50'}`}>
+                                                {a}
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* --- DIETARY TYPE --- */}
                             <div className="grid grid-cols-1 gap-6">
                                 {/* LOẠI MÓN: CHỌN NHIỀU */}
                                 <div>
-                                    <Label className="flex items-center gap-2 mb-3"><Tag className="w-4 h-4 text-orange-600" /> Loại món (Chọn nhiều)</Label>
+                                    <Label className="flex items-center gap-2 mb-3"><Tag className="w-4 h-4 text-orange-600" /> Loại món Dietary (Chọn nhiều)</Label>
                                     <div className="flex flex-wrap gap-2">
                                         {DIETARY_TYPES.map(type => {
                                             const isSelected = selectedDietary.includes(type);
@@ -245,11 +341,10 @@ function EnhancedCreateRecipeForm() {
                                                 <button
                                                     key={type}
                                                     onClick={() => toggleDietary(type)}
-                                                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border ${
-                                                        isSelected
-                                                            ? 'bg-[#FF6B35] text-white border-[#FF6B35] shadow-md transform scale-105'
-                                                            : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300 hover:bg-orange-50'
-                                                    }`}
+                                                    className={`px-4 py-2 rounded-full text-sm font-medium transition-all duration-200 border ${isSelected
+                                                        ? 'bg-[#FF6B35] text-white border-[#FF6B35] shadow-md transform scale-105'
+                                                        : 'bg-white text-gray-600 border-gray-200 hover:border-orange-300 hover:bg-orange-50'
+                                                        }`}
                                                 >
                                                     {isSelected && <CheckCircle className="w-3 h-3 inline-block mr-1" />}
                                                     {type}
@@ -259,24 +354,19 @@ function EnhancedCreateRecipeForm() {
                                     </div>
                                 </div>
 
-                                {/* QUỐC GIA: CHỌN 1 - ĐÃ ĐỔI SANG MÀU CAM */}
+                                {/* QUỐC GIA: Dropdown có tìm kiếm */}
                                 <div>
                                     <Label className="flex items-center gap-2 mb-3"><Globe className="w-4 h-4 text-blue-600" /> Ẩm thực Quốc gia</Label>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-                                        {CUISINES.map(c => (
-                                            <button
-                                                key={c}
-                                                onClick={() => setSelectedCuisine(c)}
-                                                className={`py-2 px-3 rounded-xl text-sm font-semibold transition-all border ${
-                                                    selectedCuisine === c
-                                                        ? 'bg-[#FF6B35] text-white border-[#FF6B35] shadow-md ring-2 ring-orange-200'
-                                                        : 'bg-white text-gray-600 border-gray-200 hover:bg-gray-50 hover:border-orange-200'
-                                                }`}
-                                            >
-                                                {c}
-                                            </button>
-                                        ))}
-                                    </div>
+                                    <Input
+                                        list="cuisines-list"
+                                        value={selectedCuisine}
+                                        onChange={(e) => setSelectedCuisine(e.target.value)}
+                                        placeholder="🔍 Tìm kiếm quốc gia (VD: Việt Nam, Nhật, Hàn...)"
+                                        className="w-full"
+                                    />
+                                    <datalist id="cuisines-list">
+                                        {CUISINES.map(c => <option key={c} value={c} />)}
+                                    </datalist>
                                 </div>
                             </div>
 
@@ -311,10 +401,10 @@ function EnhancedCreateRecipeForm() {
                     <CardContent>
                         <div className="grid grid-cols-2 gap-4">
                             <div className={`relative border-2 border-dashed rounded-xl p-8 text-center transition-all cursor-pointer group overflow-hidden ${mainImagePreview ? 'border-orange-500 bg-orange-50 p-0' : 'border-orange-200 hover:bg-orange-50'}`} onClick={() => !mainImagePreview && mainInputRef.current?.click()}>
-                                {mainImagePreview ? (<><img src={mainImagePreview} className="w-full h-64 object-cover" /><button onClick={(e) => { e.stopPropagation(); setMainImageFile(null); setMainImagePreview(null); }} className="absolute top-2 right-2 bg-white/80 p-2 rounded-full text-red-500 hover:bg-white shadow-sm z-10"><Trash2 className="w-5 h-5" /></button><div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs py-1">Ảnh bìa</div></>) : (<><div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3"><Upload className="w-8 h-8" /></div><p className="font-bold text-gray-700">Tải ảnh chính</p><p className="text-xs text-orange-500 mt-1">(Bắt buộc tải ảnh chính trước)</p></>)}
+                                {mainImagePreview ? (<><img src={mainImagePreview} className="w-full h-64 object-cover" /><button onClick={(e) => { e.stopPropagation(); setMainImageFile(null); setMainImagePreview(null); }} className="absolute top-2 right-2 bg-white/80 p-2 rounded-full text-red-500 hover:bg-white shadow-sm z-10"><Trash2 className="w-5 h-5" /></button><div className="absolute bottom-0 left-0 right-0 bg-black/50 text-white text-xs py-1">Ảnh bìa</div></>) : (<><div className="w-16 h-16 bg-orange-100 text-orange-500 rounded-full flex items-center justify-center mx-auto mb-3"><Upload className="w-8 h-8" /></div><p className="font-bold text-gray-700">Tải ảnh chính</p><p className="text-xs text-orange-500 mt-1">(Bắt buộc)</p></>)}
                                 <input type="file" ref={mainInputRef} className="hidden" accept="image/*" onChange={handleMainImageUpload} />
                             </div>
-                            <div className="border-2 border-dashed border-blue-200 rounded-xl p-8 text-center hover:bg-blue-50 cursor-pointer flex flex-col justify-center"><div className="w-16 h-16 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-3"><Video className="w-8 h-8" /></div><p className="font-bold text-gray-700">Thêm Video</p></div>
+                            <div onClick={() => setIsVideoModalOpen(true)} className="border-2 border-dashed border-blue-200 rounded-xl p-8 text-center hover:bg-blue-50 cursor-pointer flex flex-col justify-center"><div className="w-16 h-16 bg-blue-100 text-blue-500 rounded-full flex items-center justify-center mx-auto mb-3"><Video className="w-8 h-8" /></div><p className="font-bold text-gray-700">Thêm Video</p><p className="text-xs text-gray-400 mt-1">Youtube hoặc Upload</p></div>
                         </div>
                         <div className="mt-6">
                             <div className="flex justify-between items-center mb-3"><Label className="text-base font-semibold">Thư viện ảnh phụ</Label><span className="text-xs text-gray-500">{subImagePreviews.length}/4 ảnh</span></div>
@@ -323,7 +413,9 @@ function EnhancedCreateRecipeForm() {
                                 {[0, 1, 2, 3].map((index) => {
                                     const img = subImagePreviews[index];
                                     if (img) return (<div key={index} className="aspect-square relative rounded-xl overflow-hidden border border-gray-200 group hover:border-orange-300 transition-colors"><img src={img} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300" /><button onClick={(e) => { e.stopPropagation(); removeSubImage(index); }} className="absolute top-2 right-2 bg-white/90 p-2 rounded-full text-red-500 hover:bg-white hover:text-red-600 shadow-md transition-all z-50" type="button"><Trash2 className="w-4 h-4" /></button><div className="absolute top-2 left-2 bg-black/60 text-white text-xs px-2 py-1 rounded-full">{index + 1}</div></div>);
-                                    if (index === subImagePreviews.length && subImagePreviews.length < 4) { if (!mainImagePreview) return <div key={index} className="aspect-square border-2 border-dashed border-gray-200 rounded-xl flex flex-col items-center justify-center bg-gray-50 text-gray-400 cursor-not-allowed"><Lock className="w-6 h-6 mb-1 opacity-50" /><span className="text-[10px] text-center px-1">Cần ảnh chính</span></div>; return <div key={index} onClick={() => subInputRef.current?.click()} className="aspect-square border-2 border-dashed border-orange-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-orange-50 text-orange-500 transition-colors hover:border-orange-400"><Plus className="w-8 h-8" /><span className="text-xs font-medium mt-1">Thêm ảnh</span></div>; }
+                                    if (index === subImagePreviews.length && subImagePreviews.length < 4) {
+                                        return <div key={index} onClick={() => subInputRef.current?.click()} className="aspect-square border-2 border-dashed border-orange-300 rounded-xl flex flex-col items-center justify-center cursor-pointer hover:bg-orange-50 text-orange-500 transition-colors hover:border-orange-400"><Plus className="w-8 h-8" /><span className="text-xs font-medium mt-1">Thêm ảnh</span></div>;
+                                    }
                                     return <div key={index} className="aspect-square border-2 border-dashed border-gray-200 rounded-xl flex items-center justify-center bg-gray-50/50 text-gray-400"><span className="text-xs">Trống</span></div>;
                                 })}
                             </div>
@@ -334,15 +426,18 @@ function EnhancedCreateRecipeForm() {
 
             <div className="lg:col-span-1 space-y-6">
                 <Card className="border-0 shadow-lg" style={{ backgroundColor: '#FFF7ED' }}>
-                    <CardHeader><CardTitle className="flex justify-between items-center"><span className="flex gap-2 text-orange-700"><Package className="text-orange-600" /> Nguyên liệu</span><Badge className="text-white border-0 text-lg px-3 py-1" style={{ backgroundColor: '#FF6B35' }}>${totalCost.toFixed(2)}</Badge></CardTitle><CardDescription className="text-orange-800/70">Nhập danh sách nguyên liệu cần thiết</CardDescription></CardHeader>
+                    <CardHeader><CardTitle className="flex justify-between items-center"><span className="flex gap-2 text-orange-700"><Package className="text-orange-600" /> Nguyên liệu</span><Badge className="text-white border-0 text-lg px-3 py-1" style={{ backgroundColor: '#FF6B35' }}>{totalCost.toLocaleString('vi-VN')} đ</Badge></CardTitle><CardDescription className="text-orange-800/70">Nhập danh sách nguyên liệu cần thiết</CardDescription></CardHeader>
                     <CardContent className="space-y-4">
-                        <div className="flex gap-2 text-sm font-bold text-orange-800/60 px-1"><div className="flex-1">Tên NL</div><div className="w-16 text-center">SL</div><div className="w-16 text-center">ĐV</div><div className="w-16 text-right">Giá</div><div className="w-6"></div></div>
+                        <div className="flex gap-2 text-sm font-bold text-orange-800/60 px-1"><div className="flex-1">Tên NL</div><div className="w-16 text-center">SL</div><div className="w-16 text-center">ĐV</div><div className="w-16 text-right">Giá (k)</div><div className="w-6"></div></div>
                         <div className="space-y-2 max-h-[400px] overflow-y-auto pr-1 custom-scrollbar">
                             {ingredients.map((item) => (
                                 <div key={item.id} className="flex gap-2 items-center">
                                     <Input placeholder="Tên" className="flex-1 bg-white border-orange-200 h-9 text-sm" value={item.name} onChange={(e) => handleIngredientChange(item.id, 'name', e.target.value)} />
                                     <Input placeholder="1" type="number" className="w-16 bg-white border-orange-200 h-9 text-sm text-center" value={item.quantity} onChange={(e) => handleIngredientChange(item.id, 'quantity', e.target.value)} />
-                                    <Input placeholder="kg" className="w-16 bg-white border-orange-200 h-9 text-sm text-center" value={item.unit} onChange={(e) => handleIngredientChange(item.id, 'unit', e.target.value)} />
+                                    <select value={item.unit} onChange={e => handleIngredientChange(item.id, 'unit', e.target.value)} className="w-20 bg-white border border-orange-200 h-9 text-xs rounded cursor-pointer">
+                                        <option value="">ĐV</option>
+                                        {UNITS.map(u => <option key={u} value={u}>{u}</option>)}
+                                    </select>
                                     <Input placeholder="0" type="number" className="w-16 bg-white border-orange-200 h-9 text-sm text-right font-bold text-orange-600" value={item.price} onChange={(e) => handleIngredientChange(item.id, 'price', e.target.value)} />
                                     <button onClick={() => removeIngredientRow(item.id)} className="text-gray-400 hover:text-red-500"><Trash2 className="w-4 h-4" /></button>
                                 </div>
@@ -350,12 +445,22 @@ function EnhancedCreateRecipeForm() {
                         </div>
                         <Button variant="outline" onClick={addIngredientRow} className="w-full border-dashed border-orange-300 text-orange-600 hover:bg-orange-50"><Plus className="w-4 h-4 mr-2" /> Thêm dòng</Button>
                         <div className="bg-white p-4 rounded-xl border border-orange-100 shadow-sm space-y-2">
-                            <div className="flex justify-between text-sm"><span className="text-gray-600">Tổng chi phí:</span><span className="font-bold">${totalCost.toFixed(2)}</span></div>
-                            <div className="flex justify-between text-sm"><span className="text-gray-600">Hoa hồng (15%):</span><span className="font-bold text-orange-600">${commission.toFixed(2)}</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-600">Tổng chi phí:</span><span className="font-bold">{totalCost.toLocaleString('vi-VN')} đ</span></div>
+                            <div className="flex justify-between text-sm"><span className="text-gray-600">Hoa hồng (15%):</span><span className="font-bold text-orange-600">{commission.toLocaleString('vi-VN')} đ</span></div>
                         </div>
                     </CardContent>
                     <CardFooter className="flex flex-col gap-4">
-                        <div className="flex justify-between w-full items-center"><Label className="flex gap-2 cursor-pointer text-orange-900"><Zap className="text-amber-500" /> Chế độ Premium</Label><Switch checked={isPremium} onCheckedChange={setIsPremium} /></div>
+                        <div className="space-y-4 w-full">
+                            <div>
+                                <Label className="text-xs uppercase text-gray-500 font-bold">Mẹo Đầu Bếp</Label>
+                                <Textarea value={chefTips} onChange={e => setChefTips(e.target.value)} placeholder="Bí quyết để món ngon hơn..." className="bg-yellow-50 border-yellow-100" />
+                            </div>
+                            <div>
+                                <Label className="text-xs uppercase text-gray-500 font-bold">Hướng dẫn Bảo quản</Label>
+                                <Textarea value={storageInstruction} onChange={e => setStorageInstruction(e.target.value)} placeholder="Để tủ lạnh được bao lâu?..." className="bg-blue-50 border-blue-100" />
+                            </div>
+                        </div>
+                        <div className="flex justify-between w-full items-center mt-2"><Label className="flex gap-2 cursor-pointer text-orange-900"><Zap className="text-amber-500" /> Chế độ Premium</Label><Switch checked={isPremium} onCheckedChange={setIsPremium} /></div>
                         <div className="w-full space-y-2">
                             <Label className="text-orange-900 font-medium">Quyền riêng tư</Label>
                             <div className="flex gap-2">
@@ -368,6 +473,69 @@ function EnhancedCreateRecipeForm() {
                     </CardFooter>
                 </Card>
             </div>
+
+            {/* VIDEO UPLOAD MODAL */}
+            {isVideoModalOpen && (
+                <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50" onClick={() => setIsVideoModalOpen(false)}>
+                    <div className="bg-white rounded-2xl p-6 w-full max-w-md mx-4 shadow-2xl" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-2 mb-1">
+                            <Video className="w-6 h-6 text-orange-500" />
+                            <h3 className="text-xl font-bold">Thêm Video</h3>
+                        </div>
+                        <p className="text-sm text-gray-400 mb-6">Video ngắn giúp món ăn hấp dẫn hơn (Youtube hoặc Upload)</p>
+
+                        <div className="flex gap-3 mb-5">
+                            <button
+                                onClick={() => setVideoType('YOUTUBE')}
+                                className={`flex-1 py-3 rounded-xl border-2 font-semibold flex items-center justify-center gap-2 transition-all ${videoType === 'YOUTUBE' ? 'border-red-500 bg-red-50 text-red-600' : 'border-gray-200 hover:border-red-200'}`}
+                            >
+                                <Youtube className="w-5 h-5" /> Youtube Link
+                            </button>
+                            <button
+                                onClick={() => setVideoType('UPLOAD')}
+                                className={`flex-1 py-3 rounded-xl border-2 font-semibold flex items-center justify-center gap-2 transition-all ${videoType === 'UPLOAD' ? 'border-orange-500 bg-orange-50 text-orange-600' : 'border-gray-200 hover:border-orange-200'}`}
+                            >
+                                <Upload className="w-5 h-5" /> Upload Video
+                            </button>
+                        </div>
+
+                        {videoType === 'YOUTUBE' ? (
+                            <div className="mb-5">
+                                <Input
+                                    placeholder="Paste Youtube URL here..."
+                                    value={videoUrl}
+                                    onChange={e => setVideoUrl(e.target.value)}
+                                    className="w-full"
+                                />
+                            </div>
+                        ) : (
+                            <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center bg-gray-50 mb-5">
+                                <Upload className="w-8 h-8 mx-auto text-gray-400 mb-2" />
+                                <p className="text-sm text-gray-500">Tính năng upload video đang phát triển</p>
+                            </div>
+                        )}
+
+                        <div className="flex gap-3">
+                            <Button
+                                variant="outline"
+                                onClick={() => setIsVideoModalOpen(false)}
+                                className="flex-1"
+                            >
+                                Hủy
+                            </Button>
+                            <Button
+                                onClick={() => {
+                                    // Save video data (if YouTube URL present)
+                                    setIsVideoModalOpen(false);
+                                }}
+                                className="flex-1 bg-orange-500 hover:bg-orange-600 text-white"
+                            >
+                                Xác nhận
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }
@@ -383,29 +551,29 @@ function EnhancedRecipeHistoryList() {
             <div className="overflow-x-auto">
                 <table className="w-full">
                     <thead className="bg-gray-50 border-b border-gray-200">
-                    <tr>
-                        <th className="text-left py-4 px-6 font-bold text-gray-500 text-sm uppercase">Món ăn</th>
-                        <th className="text-left py-4 px-6 font-bold text-gray-500 text-sm uppercase">Ngày đăng</th>
-                        <th className="text-left py-4 px-6 font-bold text-gray-500 text-sm uppercase">Trạng thái</th>
-                        <th className="text-right py-4 px-6 font-bold text-gray-500 text-sm uppercase">Doanh thu</th>
-                        <th className="text-right py-4 px-6 font-bold text-gray-500 text-sm uppercase">Thao tác</th>
-                    </tr>
+                        <tr>
+                            <th className="text-left py-4 px-6 font-bold text-gray-500 text-sm uppercase">Món ăn</th>
+                            <th className="text-left py-4 px-6 font-bold text-gray-500 text-sm uppercase">Ngày đăng</th>
+                            <th className="text-left py-4 px-6 font-bold text-gray-500 text-sm uppercase">Trạng thái</th>
+                            <th className="text-right py-4 px-6 font-bold text-gray-500 text-sm uppercase">Doanh thu</th>
+                            <th className="text-right py-4 px-6 font-bold text-gray-500 text-sm uppercase">Thao tác</th>
+                        </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
-                    {ENHANCED_HISTORY.map((item) => (
-                        <tr key={item.id} className="hover:bg-orange-50/30 transition-colors group">
-                            <td className="py-4 px-6">
-                                <div className="font-bold text-gray-900 text-lg group-hover:text-[#FF6B35] transition-colors">{item.title}</div>
-                                <div className="text-xs text-gray-500 flex items-center gap-2 mt-1"><Eye className="w-3 h-3" /> {item.views}<span className="w-1 h-1 bg-gray-300 rounded-full"></span><Star className="w-3 h-3 text-yellow-500 fill-yellow-500" /> {item.rating}</div>
-                            </td>
-                            <td className="py-4 px-6 text-gray-600 font-medium">{item.date}</td>
-                            <td className="py-4 px-6">
-                                {item.status === 'published' ? (<Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-0 px-3 py-1"><CheckCircle className="w-3 h-3 mr-1" /> Đã duyệt</Badge>) : (<Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-0 px-3 py-1"><Clock className="w-3 h-3 mr-1" /> Chờ duyệt</Badge>)}
-                            </td>
-                            <td className="py-4 px-6 text-right font-bold text-green-600 text-lg">${item.revenue.toFixed(2)}</td>
-                            <td className="py-4 px-6 text-right"><Button variant="ghost" size="icon" className="text-gray-400 hover:text-[#FF6B35]"><MoreHorizontal className="w-5 h-5" /></Button></td>
-                        </tr>
-                    ))}
+                        {ENHANCED_HISTORY.map((item) => (
+                            <tr key={item.id} className="hover:bg-orange-50/30 transition-colors group">
+                                <td className="py-4 px-6">
+                                    <div className="font-bold text-gray-900 text-lg group-hover:text-[#FF6B35] transition-colors">{item.title}</div>
+                                    <div className="text-xs text-gray-500 flex items-center gap-2 mt-1"><Eye className="w-3 h-3" /> {item.views}<span className="w-1 h-1 bg-gray-300 rounded-full"></span><Star className="w-3 h-3 text-yellow-500 fill-yellow-500" /> {item.rating}</div>
+                                </td>
+                                <td className="py-4 px-6 text-gray-600 font-medium">{item.date}</td>
+                                <td className="py-4 px-6">
+                                    {item.status === 'published' ? (<Badge className="bg-green-100 text-green-700 hover:bg-green-200 border-0 px-3 py-1"><CheckCircle className="w-3 h-3 mr-1" /> Đã duyệt</Badge>) : (<Badge className="bg-yellow-100 text-yellow-700 hover:bg-yellow-200 border-0 px-3 py-1"><Clock className="w-3 h-3 mr-1" /> Chờ duyệt</Badge>)}
+                                </td>
+                                <td className="py-4 px-6 text-right font-bold text-green-600 text-lg">${item.revenue.toFixed(2)}</td>
+                                <td className="py-4 px-6 text-right"><Button variant="ghost" size="icon" className="text-gray-400 hover:text-[#FF6B35]"><MoreHorizontal className="w-5 h-5" /></Button></td>
+                            </tr>
+                        ))}
                     </tbody>
                 </table>
             </div>

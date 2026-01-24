@@ -1,4 +1,5 @@
-import { ArrowLeft, User, Heart, ShoppingBag, Settings, ChefHat, Trophy, Users, MapPin, CreditCard, Bell, LogOut, Wallet, ChevronRight, MessageCircle } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { ArrowLeft, User, Heart, ShoppingBag, Settings, ChefHat, Trophy, Users, MapPin, CreditCard, Bell, LogOut, Wallet, ChevronRight, MessageCircle, Phone } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
@@ -11,15 +12,33 @@ interface ProfilePageProps {
 }
 
 export function ProfilePage({ onNavigate }: ProfilePageProps) {
-  const user = {
-    name: 'Sarah Johnson',
-    email: 'sarah.johnson@email.com',
-    avatar: 'SJ',
-    badge: 'Master Chef',
-    following: 248,
-    followers: 1842,
-    recipesCooked: 156,
-    totalOrders: 89
+  const [user, setUser] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(true);
+  const [errorMsg, setErrorMsg] = useState('');
+
+  useEffect(() => {
+    fetch('http://localhost:8080/api/users/profile', { credentials: 'include' })
+      .then(async res => {
+        if (res.ok) return res.json();
+        const text = await res.text();
+        throw new Error(text || res.statusText);
+      })
+      .then(data => {
+        setUser(data);
+        setIsLoading(false);
+      })
+      .catch(err => {
+        console.error(err);
+        setErrorMsg(err.message);
+        setIsLoading(false);
+      });
+  }, []);
+
+  // Use real data, simplified for stats as backend might not return them yet
+  const stats = {
+    following: 0,
+    followers: 0,
+    recipesCooked: 0
   };
 
   const savedRecipes = [
@@ -80,6 +99,19 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
     { icon: '💚', label: 'Healthy Choice', desc: '25+ healthy meals' },
   ];
 
+  if (isLoading) {
+    return <div className="p-8 text-center">Loading Profile...</div>;
+  }
+
+  if (!user) {
+    return (
+      <div className="p-8 text-center">
+        <p className="text-red-500 mb-2">{errorMsg || "Please login to view profile."}</p>
+        <Button onClick={() => onNavigate('login')}>Login</Button>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-[#F9F9F9] pb-20 md:pb-8">
       {/* Header */}
@@ -98,32 +130,43 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
           {/* Profile Header */}
           <div className="flex flex-col md:flex-row items-center gap-6">
             <Avatar className="w-24 h-24 border-4 border-white shadow-lg">
-              <div className="bg-white text-[#FF6B35] flex items-center justify-center h-full w-full text-3xl font-bold">
-                {user.avatar}
-              </div>
+              {user.profileImageUrl ? (
+                <img src={user.profileImageUrl} alt="Avatar" className="w-full h-full object-cover" />
+              ) : (
+                <div className="bg-white text-[#FF6B35] flex items-center justify-center h-full w-full text-3xl font-bold">
+                  {user.fullName ? user.fullName.charAt(0).toUpperCase() : 'U'}
+                </div>
+              )}
             </Avatar>
 
             <div className="flex-1 text-center md:text-left">
               <div className="flex items-center justify-center md:justify-start gap-3 mb-2">
-                <h2 className="text-2xl font-bold">{user.name}</h2>
+                <h2 className="text-2xl font-bold">{user.fullName || user.username}</h2>
                 <Badge className="bg-[#FFB800] text-white border-0">
                   <Trophy className="w-3 h-3 mr-1" />
-                  {user.badge}
+                  {user.role === 'CREATOR' ? 'Creator' : 'Member'}
                 </Badge>
               </div>
-              <p className="text-white/90 mb-4">{user.email}</p>
+              <p className="text-white/90 mb-2">{user.email}</p>
+
+              {/* Extra Info: Phone, Address, Bio */}
+              <div className="text-sm text-white/80 space-y-1 mb-4">
+                {user.phone && <div className="flex items-center justify-center md:justify-start gap-2"><Phone className="w-3 h-3" /> {user.phone}</div>}
+                {user.address && <div className="flex items-center justify-center md:justify-start gap-2"><MapPin className="w-3 h-3" /> {user.address}</div>}
+                {user.bio && <div className="italic">"{user.bio}"</div>}
+              </div>
 
               <div className="flex gap-6 justify-center md:justify-start">
                 <div className="text-center">
-                  <div className="text-2xl font-bold">{user.recipesCooked}</div>
+                  <div className="text-2xl font-bold">{stats.recipesCooked}</div>
                   <div className="text-sm text-white/80">Recipes Cooked</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold">{user.following}</div>
+                  <div className="text-2xl font-bold">{stats.following}</div>
                   <div className="text-sm text-white/80">Following</div>
                 </div>
                 <div className="text-center">
-                  <div className="text-2xl font-bold">{user.followers}</div>
+                  <div className="text-2xl font-bold">{stats.followers}</div>
                   <div className="text-sm text-white/80">Followers</div>
                 </div>
               </div>

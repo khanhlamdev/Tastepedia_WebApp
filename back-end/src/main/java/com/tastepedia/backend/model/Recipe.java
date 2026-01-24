@@ -18,17 +18,32 @@ public class Recipe {
     private String searchText; // "banh mi thit nuong"
 
     private String description;
-    private int cookTime; // Phút
+    private int cookTime; // Thời gian nấu (phút)
+    private int prepTime; // Thời gian chuẩn bị (phút)
+
     private int servings; // Khẩu phần
     private String difficulty; // Dễ, Vừa, Khó
 
     // URL ảnh từ Cloudinary
     private String mainImageUrl;
     private List<String> subImageUrls;
+    
+    // Video
+    private String videoUrl; // Link Youtube hoặc Cloudinary
+    private String videoType; // "YOUTUBE" hoặc "UPLOAD"
 
-    // --- PHÂN LOẠI MÓN ĂN & QUỐC GIA (MỚI THÊM) ---
+    // --- PHÂN LOẠI MÓN ĂN & QUỐC GIA ---
     private List<String> dietaryType; // Ví dụ: ["Mặn", "Healthy"]
+    private List<String> mealCourse; // Sáng, Trưa, Tối, Snack...
     private String cuisine;           // Ví dụ: "Việt Nam"
+
+    // --- METADATA CHO AI ---
+    private List<String> kitchenTools; // Nồi chiên, Lò nướng...
+    private List<String> allergens;    // Đậu phộng, Hải sản...
+    
+    // --- TEXT FIELDS MỚI ---
+    private String storageInstruction; // Hướng dẫn bảo quản
+    private String chefTips;           // Mẹo đầu bếp
 
     // Các class con
     private List<Ingredient> ingredients;

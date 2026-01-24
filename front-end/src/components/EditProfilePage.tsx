@@ -168,12 +168,15 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
 
         setIsChangingPassword(true);
         try {
-            // Mock API call to verify OTP and reset
-            // In real app: POST /api/auth/verify-reset-password
-            const res = await fetch('http://localhost:8080/api/users/change-password-confirm', {
+            // Updated to use the correct AuthController endpoint
+            const res = await fetch('http://localhost:8080/api/auth/reset-password-verify', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ otp, newPassword })
+                body: JSON.stringify({
+                    email: email, // Must include email for verification
+                    otp: otp,
+                    newPassword: newPassword
+                })
             });
 
             if (res.ok) {
@@ -182,7 +185,8 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
                 localStorage.removeItem('user');
                 navigate('/login');
             } else {
-                setPasswordMessage('❌ OTP sai hoặc hết hạn!');
+                const errorText = await res.text();
+                setPasswordMessage('❌ ' + errorText);
             }
         } catch (error) {
             setPasswordMessage('❌ Lỗi hệ thống');
