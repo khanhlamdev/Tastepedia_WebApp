@@ -202,17 +202,6 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     }
   };
 
-  const handleVote = async (postId: string, optionId: number) => {
-    try {
-      const res = await fetch(`http://localhost:8080/api/community/${postId}/vote?optionId=${optionId}`, {
-        method: 'POST', credentials: 'include'
-      });
-      if (res.ok) fetchPosts(); // Reload để cập nhật số vote
-      else if (res.status === 401) alert("Please login to vote!");
-      else alert("Failed to vote or already voted.");
-    } catch (e) { console.error(e); }
-  };
-
   const openPostDetail = async (post: PostData) => {
     setSelectedPost(post);
     try {
@@ -241,6 +230,28 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
         fetchPosts();
       } else if (res.status === 401) alert("Please login to comment!");
     } catch (e) { console.error(e); }
+  };
+
+  const handleVote = async (postId: string, optionId: number) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/${postId}/vote?optionId=${optionId}`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+
+      if (res.ok) {
+        // Refresh posts to get updated vote counts
+        await fetchPosts();
+      } else if (res.status === 401) {
+        alert("Please login to vote!");
+        onNavigate('login');
+      } else {
+        const errorText = await res.text();
+        console.error("Vote failed:", errorText);
+      }
+    } catch (error) {
+      console.error("Vote error:", error);
+    }
   };
 
   const handleShare = (post: PostData) => {
@@ -354,8 +365,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
   const PollComponent = ({ post }: { post: PostData }) => {
     if (!post.poll) return null;
 
-    // Lấy User ID hiện tại từ localStorage để check xem đã vote chưa
-    // (Cách này chỉ mang tính hiển thị UI, Backend đã check kỹ rồi)
+    // Get current user ID to check if voted
     const savedUserStr = localStorage.getItem('user');
     const currentUserId = savedUserStr ? JSON.parse(savedUserStr)._id || JSON.parse(savedUserStr).id : 'guest';
 
@@ -373,16 +383,15 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
               <button
                 key={`${option.id}-${idx}`}
                 onClick={() => handleVote(post.id, option.id)}
-                // disabled={hasVoted} // Allow re-vote
-                className={`w-full text-left p-3 rounded-xl border relative overflow-hidden transition-all ${hasVoted ? 'cursor-default' : 'hover:border-primary hover:bg-orange-50 cursor-pointer'
-                  } ${isSelected ? 'border-primary ring-1 ring-primary bg-orange-50' : 'border-gray-200 bg-white'}`}
+                className={`w-full text-left p-3 rounded-xl border relative overflow-hidden transition-all hover:border-primary hover:bg-orange-50 cursor-pointer ${isSelected ? 'border-primary ring-1 ring-primary bg-orange-50' : 'border-gray-200 bg-white'
+                  }`}
               >
-                {/* Nếu đã vote -> Hiện Progress bar và %, Nếu chưa -> Chỉ hiện Text */}
+                {/* Show percentages and progress bar only if user has voted */}
                 {hasVoted ? (
                   <>
                     <div className="flex items-center justify-between mb-1 relative z-10">
-                      <span className={`font-medium ${isSelected ? 'text-primary' : ''}`}>
-                        {option.text} {isSelected && '(You)'}
+                      <span className={`${isSelected ? 'font-bold text-primary' : 'font-medium'}`}>
+                        {option.text}
                       </span>
                       <span className="text-sm font-bold">{option.percentage}%</span>
                     </div>
