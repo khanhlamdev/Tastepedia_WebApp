@@ -30,14 +30,17 @@ public class CommunityController {
     private CloudinaryService cloudinaryService;
 
     @PostMapping("/upload")
-    public ResponseEntity<?> uploadImage(@RequestParam("file") MultipartFile file, HttpSession session) {
+    public ResponseEntity<?> uploadImage(
+            @RequestParam("file") MultipartFile file, 
+            @RequestParam(value = "folder", defaultValue = "community/posts") String folder,
+            HttpSession session) {
         User currentUser = (User) session.getAttribute("MY_SESSION_USER");
         if (currentUser == null) {
             return ResponseEntity.status(401).body(Map.of("error", "Unauthorized"));
         }
         
         try {
-            String url = cloudinaryService.uploadImage(file);
+            String url = cloudinaryService.uploadImage(file, folder);
             return ResponseEntity.ok(Map.of("url", url));
         } catch (IOException e) {
             return ResponseEntity.badRequest().body(Map.of("error", "Upload failed: " + e.getMessage()));
@@ -56,6 +59,11 @@ public class CommunityController {
         User currentUser = (User) session.getAttribute("MY_SESSION_USER");
         if (currentUser == null) {
             return ResponseEntity.status(401).body("Bạn cần đăng nhập để tương tác!");
+        }
+
+        // Validate số lượng ảnh (tối đa 10)
+        if (post.getImages() != null && post.getImages().size() > 10) {
+            return ResponseEntity.badRequest().body("Chỉ được upload tối đa 10 ảnh!");
         }
 
         post.setUserId(currentUser.getId());
@@ -96,6 +104,33 @@ public class CommunityController {
             }
 
             return ResponseEntity.ok(postRepository.save(post));
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    @PutMapping("/comments/{commentId}/like")
+    public ResponseEntity<?> likeComment(@PathVariable String commentId, HttpSession session) {
+        User currentUser = (User) session.getAttribute("MY_SESSION_USER");
+        if (currentUser == null) {
+            return ResponseEntity.status(401).body("Bạn cần đăng nhập để tương tác!");
+        }
+
+        String userId = currentUser.getId();
+
+        Optional<Comment> commentOpt = commentRepository.findById(commentId);
+        if (commentOpt.isPresent()) {
+            Comment comment = commentOpt.get();
+            if (comment.getLikedUserIds() == null) comment.setLikedUserIds(new ArrayList<>());
+
+            if (comment.getLikedUserIds().contains(userId)) {
+                comment.setLikes(comment.getLikes() - 1);
+                comment.getLikedUserIds().remove(userId);
+            } else {
+                comment.setLikes(comment.getLikes() + 1);
+                comment.getLikedUserIds().add(userId);
+            }
+
+            return ResponseEntity.ok(commentRepository.save(comment));
         }
         return ResponseEntity.notFound().build();
     }
@@ -155,14 +190,21 @@ public class CommunityController {
     @PostMapping("/{postId}/comments")
     public ResponseEntity<?> addComment(
             @PathVariable String postId,
-            @RequestBody Map<String, String> payload, // content, parentCommentId (nếu là reply)
+            @RequestBody Map<String, Object> payload, // content, parentCommentId, images
             HttpSession session) {
 
         User currentUser = (User) session.getAttribute("MY_SESSION_USER");
         if (currentUser == null) return ResponseEntity.status(401).body("Unauthorized");
 
-        String content = payload.get("content");
-        String parentId = payload.get("parentCommentId"); // ID comment cha nếu đây là reply
+        String content = (String) payload.get("content");
+        String parentId = (String) payload.get("parentCommentId"); // ID comment cha nếu đây là reply
+        @SuppressWarnings("unchecked")
+        List<String> images = (List<String>) payload.get("images"); // Danh sách URL ảnh
+
+        // Validate số lượng ảnh
+        if (images != null && images.size() > 10) {
+            return ResponseEntity.badRequest().body("Chỉ được upload tối đa 10 ảnh!");
+        }
 
         if (parentId != null && !parentId.isEmpty()) {
             // Đây là Reply -> Tìm comment cha và add vào list replies
@@ -177,6 +219,9 @@ public class CommunityController {
                 //reply.setAuthorAvatar(currentUser.getAvatar() != null ? currentUser.getAvatar() : "U");
                 reply.setAuthorAvatar("U");
                 reply.setContent(content);
+                if (images != null) {
+                    reply.setImages(images);
+                }
 
                 parent.getReplies().add(reply);
                 commentRepository.save(parent); // Lưu comment cha (đã chứa reply)
@@ -195,6 +240,9 @@ public class CommunityController {
             //comment.setAuthorAvatar(currentUser.getAvatar() != null ? currentUser.getAvatar() : "U");
             comment.setAuthorAvatar("U");
             comment.setContent(content);
+            if (images != null) {
+                comment.setImages(images);
+            }
 
             Comment saved = commentRepository.save(comment);
             updatePostCommentCount(postId, 1);

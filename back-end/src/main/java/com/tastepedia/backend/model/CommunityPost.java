@@ -13,7 +13,7 @@ public class CommunityPost {
 
     private String type; // "post", "question", "tip", "poll"
     private String content;
-    private String image; // URL ảnh (nếu có)
+    private List<String> images; // URLs của các ảnh (tối đa 10)
     private List<String> tags;
 
     // Thông tin người đăng (lưu gọn để đỡ query)
@@ -38,6 +38,7 @@ public class CommunityPost {
         this.comments = 0;
         this.tags = new ArrayList<>();
         this.likedUserIds = new ArrayList<>();
+        this.images = new ArrayList<>();
     }
 
     // Inner class cho Poll
@@ -87,8 +88,8 @@ public class CommunityPost {
     public void setType(String type) { this.type = type; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
-    public String getImage() { return image; }
-    public void setImage(String image) { this.image = image; }
+    public List<String> getImages() { return images; }
+    public void setImages(List<String> images) { this.images = images; }
     public List<String> getTags() { return tags; }
     public void setTags(List<String> tags) { this.tags = tags; }
     public String getUserId() { return userId; }
