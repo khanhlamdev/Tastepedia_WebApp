@@ -7,7 +7,7 @@ import { HomePage } from './components/HomePage';
 import { SearchPage } from './components/SearchPage';
 import { RecipeDetailPage } from './components/RecipeDetailPage';
 import { ReelsPage } from './components/ReelsPage';
-import { MealPlannerPage } from './components/MealPlannerPage';
+import { MealPlanningPage } from './components/MealPlanningPage';
 import { ChatSupportPage } from './components/ChatSupportPage';
 import { CartPage } from './components/CartPage';
 import { CheckoutShippingPage } from './components/CheckoutShippingPage';
@@ -154,7 +154,7 @@ export default function App() {
 
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
-          <Route path="/meal-planner" element={<MealPlannerPage onNavigate={handleNavigate} />} />
+          <Route path="/meal-planner" element={<MealPlanningPage />} />
           <Route path="/cart" element={<CartPage onNavigate={handleNavigate} />} />
           <Route path="/checkout/shipping" element={<CheckoutShippingPage onNavigate={handleNavigate} />} />
           <Route path="/checkout/payment" element={<CheckoutPaymentPage onNavigate={handleNavigate} />} />

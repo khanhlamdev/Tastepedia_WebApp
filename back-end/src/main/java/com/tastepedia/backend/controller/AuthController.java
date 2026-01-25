@@ -34,7 +34,7 @@ public class AuthController {
     @Autowired
     EmailService emailService;
 
-    // --- 1. API QUÊN MẬT KHẨU ---
+    // --- 1. API QUÊN MẬT KHẨU (Gửi OTP) ---
     @PostMapping("/forgot-password")
     public ResponseEntity<?> forgotPassword(@RequestBody String email) {
         String cleanEmail = email.replace("\"", "").trim();
@@ -45,18 +45,40 @@ public class AuthController {
         }
 
         User user = userOptional.get();
-        String newPassword = UUID.randomUUID().toString().substring(0, 8);
-
-        user.setPassword(passwordEncoder.encode(newPassword));
+        // Generate OTP
+        String otp = String.format("%06d", new java.util.Random().nextInt(999999));
+        
+        user.setOtpCode(otp);
         userRepository.save(user);
 
         emailService.sendEmail(
                 cleanEmail,
-                "Cấp lại mật khẩu - Tastepedia",
-                "Chào bạn " + user.getFullName() + ",\n\nMật khẩu mới của bạn là: " + newPassword + "\n\nVui lòng đăng nhập và đổi lại mật khẩu ngay."
+                "Mã OTP Khôi phục mật khẩu - Tastepedia",
+                "Chào bạn " + user.getFullName() + ",\n\nMã OTP khôi phục mật khẩu của bạn là: " + otp + "\n\nMã này có hiệu lực để đặt lại mậtkhẩu."
         );
 
-        return ResponseEntity.ok("Mật khẩu mới đã được gửi tới email của bạn!");
+        return ResponseEntity.ok("Mã OTP đã được gửi tới email của bạn!");
+    }
+
+    // --- 1.1 API XÁC NHẬN OTP & ĐỔI MẬT KHẨU (Dành cho Forgot Password) ---
+    @PostMapping("/reset-password-verify")
+    public ResponseEntity<?> resetPasswordVerify(@RequestBody com.tastepedia.backend.payload.ResetPasswordRequest request) {
+        Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
+        if (userOptional.isEmpty()) {
+            return ResponseEntity.badRequest().body("Email không tồn tại!");
+        }
+
+        User user = userOptional.get();
+
+        if (user.getOtpCode() == null || !user.getOtpCode().equals(request.getOtp())) {
+            return ResponseEntity.badRequest().body("Mã OTP không đúng hoặc đã hết hạn!");
+        }
+
+        user.setPassword(passwordEncoder.encode(request.getNewPassword()));
+        user.setOtpCode(null); // Xóa OTP sau khi dùng
+        userRepository.save(user);
+
+        return ResponseEntity.ok("Đặt lại mật khẩu thành công! Vui lòng đăng nhập.");
     }
 
     // --- 2. API ĐĂNG KÝ (Gửi OTP) ---

@@ -187,21 +187,45 @@ public class RecipeController {
 
             // Parse JSON data
             ObjectMapper mapper = new ObjectMapper();
-            Recipe updatedData = mapper.readValue(recipeJson, Recipe.class);
+            Recipe updatedRecipe = mapper.readValue(recipeJson, Recipe.class);
 
-            // Giữ lại ID và thông tin tác giả
-            updatedData.setId(id);
-            updatedData.setAuthorId(existingRecipe.getAuthorId());
-            updatedData.setAuthorName(existingRecipe.getAuthorName());
-            updatedData.setCreatedAt(existingRecipe.getCreatedAt());
+            // Update basic info
+            existingRecipe.setTitle(updatedRecipe.getTitle());
+            existingRecipe.setDescription(updatedRecipe.getDescription());
+            existingRecipe.setCookTime(updatedRecipe.getCookTime());
+            existingRecipe.setPrepTime(updatedRecipe.getPrepTime()); // NEW
+            existingRecipe.setServings(updatedRecipe.getServings());
+            existingRecipe.setDifficulty(updatedRecipe.getDifficulty());
+            
+            // Update Classification
+            existingRecipe.setDietaryType(updatedRecipe.getDietaryType());
+            existingRecipe.setMealCourse(updatedRecipe.getMealCourse()); // NEW
+            existingRecipe.setCuisine(updatedRecipe.getCuisine());
+            
+            // Update AI/Meta fields
+            existingRecipe.setKitchenTools(updatedRecipe.getKitchenTools()); // NEW
+            existingRecipe.setAllergens(updatedRecipe.getAllergens());       // NEW
+            existingRecipe.setStorageInstruction(updatedRecipe.getStorageInstruction()); // NEW
+            existingRecipe.setChefTips(updatedRecipe.getChefTips());         // NEW
+            
+            // Update Video
+            existingRecipe.setVideoUrl(updatedRecipe.getVideoUrl());         // NEW
+            existingRecipe.setVideoType(updatedRecipe.getVideoType());       // NEW
+
+            // Update Complex Objects
+            existingRecipe.setIngredients(updatedRecipe.getIngredients());
+            existingRecipe.setSteps(updatedRecipe.getSteps());
+            existingRecipe.setNutrition(updatedRecipe.getNutrition());
+            existingRecipe.setTotalCost(updatedRecipe.getTotalCost());
 
             // Upload ảnh mới nếu có
             if (mainImage != null && !mainImage.isEmpty()) {
                 String mainUrl = cloudinaryService.uploadImage(mainImage);
-                updatedData.setMainImageUrl(mainUrl);
-            } else {
-                updatedData.setMainImageUrl(existingRecipe.getMainImageUrl());
+                existingRecipe.setMainImageUrl(mainUrl);
+            } else if (updatedRecipe.getMainImageUrl() != null) { // If main image was removed from frontend
+                existingRecipe.setMainImageUrl(updatedRecipe.getMainImageUrl());
             }
+
 
             // Upload ảnh phụ mới nếu có
             if (subImages != null && !subImages.isEmpty()) {
@@ -212,17 +236,17 @@ public class RecipeController {
                         subUrls.add(url);
                     }
                 }
-                updatedData.setSubImageUrls(subUrls);
+                existingRecipe.setSubImageUrls(subUrls);
             } else {
-                updatedData.setSubImageUrls(existingRecipe.getSubImageUrls());
+                existingRecipe.setSubImageUrls(existingRecipe.getSubImageUrls());
             }
 
             // Cập nhật searchText
-            if (updatedData.getTitle() != null) {
-                updatedData.setSearchText(StringUtils.removeAccent(updatedData.getTitle()).toLowerCase());
+            if (existingRecipe.getTitle() != null) {
+                existingRecipe.setSearchText(StringUtils.removeAccent(existingRecipe.getTitle()).toLowerCase());
             }
 
-            Recipe savedRecipe = recipeRepository.save(updatedData);
+            Recipe savedRecipe = recipeRepository.save(existingRecipe);
             return ResponseEntity.ok(savedRecipe);
 
         } catch (Exception e) {

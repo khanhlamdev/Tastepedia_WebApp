@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Star, Clock, Heart, CheckCircle, Users, Award, TrendingUp, Truck, MessageSquare, Smile, Meh, Frown, X, Utensils, Store, MessageCircle, Sparkles } from 'lucide-react';
+import { Star, Clock, Heart, CheckCircle, Users, Award, TrendingUp, Truck, MessageSquare, Smile, Meh, Frown, X, Utensils, Store, MessageCircle, Sparkles, Video } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Avatar } from './ui//avatar';
@@ -207,6 +207,7 @@ interface Recipe {
   mainImageUrl: string;
   cookTime: number;
   totalCost: number;
+  videoUrl?: string; // NEW
   // Mock fields for UI
   rating?: number;
 }
@@ -244,6 +245,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
           mainImageUrl: item.mainImageUrl || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c", // Fallback image
           cookTime: item.cookTime,
           totalCost: item.totalCost,
+          videoUrl: item.videoUrl, // NEW
           rating: 4.5 + Math.random() * 0.5 // Mock rating 4.5 - 5.0
         }));
 
@@ -432,6 +434,13 @@ export function HomePage({ onNavigate }: HomePageProps) {
                       alt={recipe.title}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
                     />
+                    <div className="absolute top-3 left-3">
+                      {recipe.videoUrl && (
+                        <Badge className="bg-red-500/90 backdrop-blur-sm text-white border-0 flex items-center gap-1 mb-2">
+                          <Video className="w-3 h-3" /> Video hướng dẫn
+                        </Badge>
+                      )}
+                    </div>
                     <button className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors">
                       <Heart className="w-5 h-5 text-gray-700" />
                     </button>

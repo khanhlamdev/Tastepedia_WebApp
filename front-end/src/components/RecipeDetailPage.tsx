@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import {
   ArrowLeft, Star, Clock, Users, Heart, Share2, ShoppingCart,
   CheckCircle2, ChefHat, Bike,
-  ChevronLeft, ChevronRight, Tag, Globe
+  ChevronLeft, ChevronRight, Tag, Globe, Video
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -23,6 +23,7 @@ interface RecipeData {
   title: string;
   description: string;
   cookTime: number;
+  prepTime?: number; // NEW: Split time
   servings: number;
   difficulty: string;
   mainImageUrl: string;
@@ -31,6 +32,12 @@ interface RecipeData {
   // --- TRƯỜNG MỚI TỪ BACKEND ---
   dietaryType?: string[];
   cuisine?: string;
+  mealCourse?: string[]; // NEW
+  kitchenTools?: string[]; // NEW
+  allergens?: string[]; // NEW
+  chefTips?: string; // NEW
+  storageInstruction?: string; // NEW
+  videoUrl?: string; // NEW
 
   ingredients: { name: string; quantity: string; unit: string; price: number }[];
   steps: { stepNumber: number; content: string }[];
@@ -133,20 +140,38 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
   };
 
   const toggleFavorite = async () => {
-    if (!recipeId) return;
+    if (!recipeId) {
+      alert('Không tìm thấy ID công thức!');
+      return;
+    }
 
     try {
       const method = isLiked ? 'DELETE' : 'POST';
+      console.log(`Toggling favorite: ${method} /api/favorites/${recipeId}`);
+
       const res = await fetch(`http://localhost:8080/api/favorites/${recipeId}`, {
         method,
         credentials: 'include'
       });
 
+      console.log('Response status:', res.status);
+      const responseText = await res.text();
+      console.log('Response:', responseText);
+
       if (res.ok) {
         setIsLiked(!isLiked);
+        alert(isLiked ? 'Đã xóa khỏi yêu thích!' : 'Đã thêm vào yêu thích!');
+      } else if (res.status === 401 || res.status === 403) {
+        // Not logged in
+        alert('⚠️ Vui lòng đăng nhập để thêm vào yêu thích!');
+        navigate('/login');
+      } else {
+        // Other error
+        alert(`Lỗi: ${responseText}`);
       }
     } catch (error) {
       console.error('Error toggling favorite:', error);
+      alert('Lỗi kết nối! Vui lòng thử lại.');
     }
   };
 
@@ -215,19 +240,29 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
   const description = recipe?.description || "A beloved Vietnamese dish...";
   const fallbackImage = "https://images.unsplash.com/photo-1763703544688-2ac7839b0659";
 
-  const allImages = recipe
-    ? [recipe.mainImageUrl, ...(recipe.subImageUrls || [])].filter(url => url && url.trim() !== '')
-    : [fallbackImage];
+  // Create unified media array with VIDEO FIRST, then images
+  type MediaItem = { type: 'image'; url: string } | { type: 'video'; url: string };
 
-  const displayImages = allImages.length > 0 ? allImages : [fallbackImage];
+  const allMedia: MediaItem[] = recipe
+    ? [
+      // VIDEO FIRST
+      ...(recipe.videoUrl ? [{ type: 'video' as const, url: recipe.videoUrl }] : []),
+      // Then images
+      ...(recipe.mainImageUrl ? [{ type: 'image' as const, url: recipe.mainImageUrl }] : []),
+      ...(recipe.subImageUrls || []).map(url => ({ type: 'image' as const, url }))
+    ].filter(item => item.url && item.url.trim() !== '')
+    : [{ type: 'image' as const, url: fallbackImage }];
+
+  const displayMedia = allMedia.length > 0 ? allMedia : [{ type: 'image' as const, url: fallbackImage }];
 
   const time = recipe?.cookTime || 45;
+  const prepTime = recipe?.prepTime || 0;
   const servings = recipe?.servings || 4;
   const stepsToRender = recipe ? displaySteps : [];
   const ingredientsToRender = recipe ? displayIngredients : [];
 
-  const nextImage = () => setCurrentImageIndex((prev) => (prev + 1) % displayImages.length);
-  const prevImage = () => setCurrentImageIndex((prev) => (prev - 1 + displayImages.length) % displayImages.length);
+  const nextMedia = () => setCurrentImageIndex((prev) => (prev + 1) % displayMedia.length);
+  const prevMedia = () => setCurrentImageIndex((prev) => (prev - 1 + displayMedia.length) % displayMedia.length);
 
   return (
     <div className="min-h-screen bg-[#F9F9F9] pb-32 md:pb-8 scroll-smooth">
@@ -249,31 +284,43 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
           {/* Left Column */}
           <div className="lg:col-span-2">
 
-            {/* IMAGE CAROUSEL */}
+            {/* MEDIA CAROUSEL (Images + Video) */}
             <div className="relative aspect-video w-full overflow-hidden md:rounded-3xl mb-4 md:mb-6 group bg-gray-100">
               <div className="flex h-full transition-transform duration-500 ease-in-out" style={{ transform: `translateX(-${currentImageIndex * 100}%)` }}>
-                {displayImages.map((imgUrl, index) => (
-                  <img key={index} src={imgUrl} alt={`${title} image ${index + 1}`} className="w-full h-full object-cover flex-shrink-0" />
+                {displayMedia.map((media, index) => (
+                  <div key={index} className="w-full h-full flex-shrink-0">
+                    {media.type === 'image' ? (
+                      <img src={media.url} alt={`${title} image ${index + 1}`} className="w-full h-full object-cover" />
+                    ) : (
+                      <iframe
+                        src={`https://www.youtube.com/embed/${media.url.includes('youtube.com') ? new URL(media.url).searchParams.get('v') : media.url.split('/').pop()}`}
+                        title={`${title} video`}
+                        className="w-full h-full"
+                        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                        allowFullScreen
+                      />
+                    )}
+                  </div>
                 ))}
               </div>
               <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent pointer-events-none"></div>
 
-              {displayImages.length > 1 && (
+              {displayMedia.length > 1 && (
                 <>
-                  <button onClick={(e) => { e.stopPropagation(); prevImage(); }} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition-all z-10 shadow-lg"><ChevronLeft className="w-6 h-6" /></button>
-                  <button onClick={(e) => { e.stopPropagation(); nextImage(); }} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition-all z-10 shadow-lg"><ChevronRight className="w-6 h-6" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); prevMedia(); }} className="absolute left-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition-all z-10 shadow-lg"><ChevronLeft className="w-6 h-6" /></button>
+                  <button onClick={(e) => { e.stopPropagation(); nextMedia(); }} className="absolute right-4 top-1/2 -translate-y-1/2 bg-black/50 hover:bg-black/80 text-white p-2 rounded-full backdrop-blur-sm transition-all z-10 shadow-lg"><ChevronRight className="w-6 h-6" /></button>
                 </>
               )}
 
-              {displayImages.length > 1 && (
+              {displayMedia.length > 1 && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-                  {displayImages.map((_, idx) => (
+                  {displayMedia.map((media, idx) => (
                     <button key={idx} onClick={() => setCurrentImageIndex(idx)} className={`h-2 rounded-full transition-all duration-300 shadow-sm ${idx === currentImageIndex ? 'bg-white w-6' : 'bg-white/50 w-2 hover:bg-white/80'}`} />
                   ))}
                 </div>
               )}
 
-              <div className="absolute top-4 right-4 flex gap-2 z-10">
+              <div className="absolute top-4 right-4 flex gap-2 z-20">
                 <button onClick={toggleFavorite} className="p-3 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors shadow-sm"><Heart className={`w-6 h-6 ${isLiked ? 'fill-red-500 text-red-500' : 'text-gray-700'}`} /></button>
                 <button className="p-3 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors shadow-sm"><Share2 className="w-6 h-6 text-gray-700" /></button>
               </div>
@@ -281,7 +328,7 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
 
             <div className="bg-white md:rounded-3xl p-4 md:p-6 mb-4 md:mb-6">
               <div className="mb-6">
-                {/* --- HIỂN THỊ TAGS LOẠI MÓN & QUỐC GIA MỚI --- */}
+                {/* --- HIỂN THỊ TAGS LOẠI MÓN, QUỐC GIA & MẠT COURSES --- */}
                 <div className="flex flex-wrap gap-2 mb-3">
                   {/* Badge Quốc Gia */}
                   {recipe?.cuisine && (
@@ -295,6 +342,18 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
                       <Tag className="w-3 h-3" /> {type}
                     </Badge>
                   ))}
+                  {/* Meal Course Badges */}
+                  {recipe?.mealCourse && recipe.mealCourse.map((course, idx) => (
+                    <Badge key={idx} className="bg-purple-100 text-purple-700 border-purple-300 px-3 py-1">
+                      {course}
+                    </Badge>
+                  ))}
+                  {/* Video Tutorial Badge */}
+                  {recipe?.videoUrl && (
+                    <Badge className="bg-red-100 text-red-600 border-red-300 px-3 py-1 flex items-center gap-1">
+                      <Video className="w-3 h-3" /> Video hướng dẫn
+                    </Badge>
+                  )}
                 </div>
 
                 <h1 className="text-3xl md:text-4xl font-bold mb-3">{title}</h1>
@@ -306,7 +365,8 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
                     <span className="font-semibold">{averageRating}</span>
                     <span className="text-gray-500">({totalReviews} reviews)</span>
                   </button>
-                  <div className="flex items-center gap-2"><Clock className="w-5 h-5 text-gray-600" /><span>{time} mins</span></div>
+                  {prepTime > 0 && <div className="flex items-center gap-2"><Clock className="w-5 h-5 text-orange-600" /><span>Prep: {prepTime}m</span></div>}
+                  <div className="flex items-center gap-2"><Clock className="w-5 h-5 text-red-600" /><span>Cook: {time}m</span></div>
                   <div className="flex items-center gap-2"><Users className="w-5 h-5 text-gray-600" /><span>{servings} servings</span></div>
                 </div>
               </div>
@@ -318,6 +378,56 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
                 <div className="text-center"><div className="text-2xl font-bold">{recipe?.nutrition?.fat || 0}g</div><div className="text-xs text-gray-600">Fat</div></div>
                 <div className="text-center"><div className="text-2xl font-bold">{recipe?.nutrition?.carb || 0}g</div><div className="text-xs text-gray-600">Carbs</div></div>
               </div>
+
+              {/* Kitchen Tools */}
+              {recipe?.kitchenTools && recipe.kitchenTools.length > 0 && (
+                <div className="bg-blue-50 p-4 rounded-2xl mb-4 border border-blue-200">
+                  <h3 className="font-bold text-blue-900 mb-3 flex items-center gap-2">
+                    <ChefHat className="w-5 h-5" /> Kitchen Tools Needed
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {recipe.kitchenTools.map((tool, idx) => (
+                      <span key={idx} className="px-3 py-1.5 bg-white rounded-full text-sm border border-blue-200">
+                        {tool}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Allergen Warnings */}
+              {recipe?.allergens && recipe.allergens.length > 0 && (
+                <div className="bg-red-50 p-4 rounded-2xl mb-4 border border-red-200">
+                  <h3 className="font-bold text-red-700 mb-3 flex items-center gap-2">
+                    ⚠️ Allergen Warnings
+                  </h3>
+                  <div className="flex flex-wrap gap-2">
+                    {recipe.allergens.map((allergen, idx) => (
+                      <Badge key={idx} className="bg-red-100 text-red-700 border-red-300">
+                        {allergen}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Chef's Tips */}
+              {recipe?.chefTips && (
+                <div className="bg-yellow-50 p-4 rounded-2xl mb-4 border border-yellow-200">
+                  <h3 className="font-bold text-yellow-900 mb-2 flex items-center gap-2">
+                    <ChefHat className="w-5 h-5 text-yellow-700" /> Chef's Tips
+                  </h3>
+                  <p className="text-gray-700">{recipe.chefTips}</p>
+                </div>
+              )}
+
+              {/* Storage Instructions */}
+              {recipe?.storageInstruction && (
+                <div className="bg-indigo-50 p-4 rounded-2xl mb-4 border border-indigo-200">
+                  <h3 className="font-bold text-indigo-900 mb-2">📦 Storage Instructions</h3>
+                  <p className="text-gray-700">{recipe.storageInstruction}</p>
+                </div>
+              )}
 
               <Separator className="my-6" />
 
@@ -405,13 +515,13 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
                     return (
                       <div key={ingredient.id} className={`flex items-center justify-between p-3 rounded-xl transition-colors ${isSelected ? 'bg-[#FF6B35]/5' : 'bg-gray-50'}`}>
                         <div className="flex items-center gap-2 flex-1"><Checkbox checked={isSelected} onCheckedChange={() => toggleIngredient(ingredient.id)} /><div className="flex-1"><div className="text-sm font-medium">{ingredient.name}</div><div className="text-xs text-gray-500">{ingredient.amount}</div></div></div>
-                        <div className="font-semibold">${ingredient.price.toFixed(2)}</div>
+                        <div className="font-semibold">{ingredient.price.toLocaleString('vi-VN')} đ</div>
                       </div>
                     );
                   })}
                 </div>
                 <Separator className="my-4" />
-                <div className="flex justify-between items-center mb-4"><span className="font-semibold">Total:</span><span className="text-2xl font-bold text-[#FF6B35]">${totalPrice.toFixed(2)}</span></div>
+                <div className="flex justify-between items-center mb-4"><span className="font-semibold">Total:</span><span className="text-2xl font-bold text-[#FF6B35]">{totalPrice.toLocaleString('vi-VN')} đ</span></div>
                 <Button className="w-full h-12 bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-full mb-3"><ShoppingCart className="w-5 h-5 mr-2" />Add to Cart & Delivery</Button>
                 <div className="flex items-center justify-center gap-2 text-sm text-gray-500"><CheckCircle2 className="w-4 h-4 text-[#4CAF50]" />Delivery in 30-45 mins</div>
               </div>
@@ -422,10 +532,10 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
 
       <div className="fixed bottom-0 left-0 right-0 z-50 bg-white/95 backdrop-blur-xl border-t-2 border-gray-200 shadow-2xl lg:hidden">
         <div className="max-w-7xl mx-auto px-4 py-4">
-          <div className="flex items-center justify-between mb-3"><span className="text-sm text-gray-600">Ingredient Cost:</span><span className="text-xl font-bold text-[#FF6B35]">${totalPrice.toFixed(2)}</span></div>
+          <div className="flex items-center justify-between mb-3"><span className="text-sm text-gray-600">Ingredient Cost:</span><span className="text-xl font-bold text-[#FF6B35]">{totalPrice.toLocaleString('vi-VN')} đ</span></div>
           <div className="grid grid-cols-2 gap-3">
-            <Button onClick={scrollToIngredients} className="h-14 bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-2xl font-semibold text-sm transition-all hover:scale-105 shadow-lg"><ChefHat className="w-5 h-5 mr-2" /><div className="text-left"><div>Cook It</div><div className="text-xs opacity-90">${totalPrice.toFixed(2)}</div></div></Button>
-            <Button onClick={handleOrderReadyMeal} className="h-14 bg-[#4CAF50] hover:bg-[#45a049] text-white rounded-2xl font-semibold text-sm transition-all hover:scale-105 shadow-lg"><Bike className="w-5 h-5 mr-2" /><div className="text-left"><div>Order It</div><div className="text-xs opacity-90">from $5.00</div></div></Button>
+            <Button onClick={scrollToIngredients} className="h-14 bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-2xl font-semibold text-sm transition-all hover:scale-105 shadow-lg"><ChefHat className="w-5 h-5 mr-2" /><div className="text-left"><div>Cook It</div><div className="text-xs opacity-90">{totalPrice.toLocaleString('vi-VN')} đ</div></div></Button>
+            <Button onClick={handleOrderReadyMeal} className="h-14 bg-[#4CAF50] hover:bg-[#45a049] text-white rounded-2xl font-semibold text-sm transition-all hover:scale-105 shadow-lg"><Bike className="w-5 h-5 mr-2" /><div className="text-left"><div>Order It</div><div className="text-xs opacity-90">from 35.000 đ</div></div></Button>
           </div>
         </div>
       </div>
