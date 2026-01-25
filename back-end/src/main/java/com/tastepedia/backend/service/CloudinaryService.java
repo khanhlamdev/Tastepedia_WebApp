@@ -15,19 +15,27 @@ public class CloudinaryService {
     @Autowired
     private Cloudinary cloudinary;
 
-    public String uploadImage(MultipartFile file) throws IOException {
-        // --- SỬA ĐOẠN NÀY ---
-        // Thêm tham số "resource_type", "auto" để Cloudinary tự nhận diện là Video hay Ảnh
-        // Nếu là Video, nó sẽ cho phép dung lượng > 10MB (tối đa 100MB bản Free)
+    public String uploadImage(MultipartFile file, String folder) throws IOException {
+        // Validate folder để tránh upload vào folder không hợp lệ
+        String validFolder = folder;
+        if (!folder.equals("community/posts") && 
+            !folder.equals("community/comments") && 
+            !folder.equals("tastepedia_recipes")) {
+            validFolder = "community/posts"; // Default folder
+        }
+
         Map params = ObjectUtils.asMap(
                 "resource_type", "auto",
-                "folder", "tastepedia_recipes" // (Tùy chọn) Gom vào thư mục cho gọn
+                "folder", validFolder
         );
 
         Map uploadResult = cloudinary.uploader().upload(file.getBytes(), params);
 
-        // --------------------
-
         return uploadResult.get("secure_url").toString();
+    }
+
+    // Overload method để backward compatibility
+    public String uploadImage(MultipartFile file) throws IOException {
+        return uploadImage(file, "tastepedia_recipes");
     }
 }

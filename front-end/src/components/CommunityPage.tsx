@@ -50,16 +50,19 @@ interface CommentData {
   authorName: string;
   authorAvatar: string;
   content: string;
+  images?: string[]; // Added images support
   createdAt: string;
   likes: number;
+  likedUserIds?: string[]; // Added for like status tracking
   replies: CommentData[];
 }
 
 interface PostData {
   id: string;
+  userId: string; // Added userId for ownership check
   type: string; // 'post', 'question', 'poll', 'tip'
   content: string;
-  image?: string;
+  images?: string[]; // Changed from single image to array
   tags: string[];
   authorName: string;
   authorAvatar: string;
@@ -88,7 +91,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
   const [newPostContent, setNewPostContent] = useState('');
   const [pollQuestion, setPollQuestion] = useState('');
   const [pollOptions, setPollOptions] = useState(['', '']);
-  const [imageUrl, setImageUrl] = useState('');
+  const [imageUrls, setImageUrls] = useState<string[]>([]); // Changed to array
   const [tagsInput, setTagsInput] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
@@ -96,6 +99,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
   const [selectedPost, setSelectedPost] = useState<PostData | null>(null); // Bài viết đang xem chi tiết
   const [postComments, setPostComments] = useState<CommentData[]>([]);
   const [newCommentContent, setNewCommentContent] = useState('');
+  const [commentImageUrls, setCommentImageUrls] = useState<string[]>([]); // Images for comments
   const [replyingTo, setReplyingTo] = useState<string | null>(null); // ID comment đang reply
 
   const [showFABLabel, setShowFABLabel] = useState(true);
@@ -137,6 +141,12 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
       if (!newPostContent.trim()) return;
     }
 
+    // Validate image limit
+    if (imageUrls.length > 10) {
+      alert('Chỉ được upload tối đa 10 ảnh!');
+      return;
+    }
+
     setIsSubmitting(true);
 
     const processedTags = tagsInput.split(',').map(tag => tag.trim()).filter(tag => tag !== '');
@@ -146,7 +156,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
       content: newPostContent,
       likes: 0,
       comments: 0,
-      image: imageUrl, // Gửi link ảnh lên server
+      images: imageUrls, // Send array of image URLs
       tags: processedTags.length > 0 ? processedTags : [],
     };
 
@@ -173,7 +183,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
         setNewPostContent('');
         setPollQuestion('');
         setPollOptions(['', '']);
-        setImageUrl('');
+        setImageUrls([]); // Reset to empty array
         setTagsInput('');
         setCreateMode('general'); // Reset về mặc định
         setSelectedGeneralType('post');
@@ -197,8 +207,36 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     } catch (e) { console.error(e); }
   };
 
+  const handleCommentLike = async (commentId: string) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/comments/${commentId}/like`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+      });
+
+      if (res.ok) {
+        // Reload comments to get updated like count
+        if (selectedPost) {
+          openPostDetail(selectedPost);
+        }
+      } else if (res.status === 401) {
+        alert("Vui lòng đăng nhập để like!");
+      }
+    } catch (error) {
+      console.error("Comment like error", error);
+    }
+  };
+
   const handleSendComment = async () => {
     if (!selectedPost || !newCommentContent.trim()) return;
+
+    // Validate image limit
+    if (commentImageUrls.length > 10) {
+      alert('Chỉ được upload tối đa 10 ảnh!');
+      return;
+    }
+
     try {
       const res = await fetch(`http://localhost:8080/api/community/${selectedPost.id}/comments`, {
         method: 'POST',
@@ -206,11 +244,13 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
         credentials: 'include',
         body: JSON.stringify({
           content: newCommentContent,
-          parentCommentId: replyingTo
+          parentCommentId: replyingTo,
+          images: commentImageUrls.length > 0 ? commentImageUrls : undefined
         })
       });
       if (res.ok) {
         setNewCommentContent('');
+        setCommentImageUrls([]); // Reset images
         setReplyingTo(null);
         // Reload comments & Post (để cập nhật số comment count)
         openPostDetail(selectedPost);
@@ -261,31 +301,49 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     .sort((a, b) => b.count - a.count)
     .slice(0, 10); // Top 10 topics
 
-  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
+  const handleMultipleImageUpload = async (files: FileList | null, folder: 'posts' | 'comments') => {
+    if (!files || files.length === 0) return;
+
+    const targetFolder = folder === 'posts' ? 'community/posts' : 'community/comments';
+    const currentUrls = folder === 'posts' ? imageUrls : commentImageUrls;
+    const setterFunc = folder === 'posts' ? setImageUrls : setCommentImageUrls;
+
+    // Check limit
+    if (currentUrls.length + files.length > 10) {
+      alert('Chỉ được upload tối đa 10 ảnh!');
+      return;
+    }
 
     setIsUploading(true);
-    const formData = new FormData();
-    formData.append('file', file);
+    const uploadedUrls: string[] = [];
 
     try {
-      const res = await fetch('http://localhost:8080/api/community/upload', {
-        method: 'POST',
-        body: formData,
-        credentials: 'include'
-      });
+      for (const file of Array.from(files)) {
+        const formData = new FormData();
+        formData.append('file', file);
 
-      if (res.ok) {
-        const data = await res.json();
-        setImageUrl(data.url);
-      } else if (res.status === 401) {
-        alert("Please login to upload images!");
-        onNavigate('login');
-      } else {
-        const errorText = await res.text();
-        alert("Upload failed: " + errorText);
+        const res = await fetch(`http://localhost:8080/api/community/upload?folder=${targetFolder}`, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include'
+        });
+
+        if (res.ok) {
+          const data = await res.json();
+          uploadedUrls.push(data.url);
+        } else if (res.status === 401) {
+          alert("Please login to upload images!");
+          onNavigate('login');
+          break;
+        } else {
+          const errorText = await res.text();
+          alert("Upload failed: " + errorText);
+          break;
+        }
       }
+
+      // Add uploaded URLs to the current list
+      setterFunc([...currentUrls, ...uploadedUrls]);
     } catch (err) {
       console.error("Upload error", err);
       alert("Upload failed. Please try again.");
@@ -348,7 +406,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     const hasVoted = Object.keys(userVotesMap).includes(currentUserId);
     const votedOptionId = userVotesMap[currentUserId];
 
-    console.log('PollComponent - Post:', post.id, 'Options:', post.poll.options.map((o, i) => ({ index: i, id: o.id, text: o.text })), 'VotedOptionId:', votedOptionId);
+    // Removed console.log to prevent spam
 
     return (
       <div className="mb-4 p-4 bg-muted/50 rounded-2xl border border-gray-100">
@@ -392,21 +450,153 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     );
   };
 
-  // 2. Component Dropdown 3 chấm
-  const PostOptions = () => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
-        <DropdownMenuItem><Edit className="w-4 h-4 mr-2" /> Edit Post</DropdownMenuItem>
-        <DropdownMenuItem><Flag className="w-4 h-4 mr-2" /> Report</DropdownMenuItem>
-        <DropdownMenuItem className="text-red-600"><Trash2 className="w-4 h-4 mr-2" /> Delete</DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  // Facebook-style Image Grid Component
+  const ImageGrid = ({ images, onClick }: { images?: string[], onClick?: () => void }) => {
+    if (!images || images.length === 0) return null;
+
+    const imageCount = images.length;
+
+    // Single image - full width
+    if (imageCount === 1) {
+      return (
+        <div className="mb-4 rounded-2xl overflow-hidden cursor-pointer" onClick={onClick}>
+          <img
+            src={images[0]}
+            alt="Post"
+            className="w-full h-64 object-cover hover:scale-105 transition-transform duration-300"
+          />
+        </div>
+      );
+    }
+
+    // Two images - side by side
+    if (imageCount === 2) {
+      return (
+        <div className="grid grid-cols-2 gap-2 mb-4 rounded-2xl overflow-hidden">
+          {images.map((img, i) => (
+            <img
+              key={i}
+              src={img}
+              alt={`Post ${i + 1}`}
+              className="w-full h-48 object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+              onClick={onClick}
+            />
+          ))}
+        </div>
+      );
+    }
+
+    // 3 images - First large, 2 small on right
+    if (imageCount === 3) {
+      return (
+        <div className="grid grid-cols-2 gap-2 mb-4 rounded-2xl overflow-hidden">
+          <img
+            src={images[0]}
+            alt="Post 1"
+            className="row-span-2 w-full h-full object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+            onClick={onClick}
+          />
+          <img
+            src={images[1]}
+            alt="Post 2"
+            className="w-full h-32 object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+            onClick={onClick}
+          />
+          <img
+            src={images[2]}
+            alt="Post 3"
+            className="w-full h-32 object-cover cursor-pointer hover:scale-105 transition-transform duration-300"
+            onClick={onClick}
+          />
+        </div>
+      );
+    }
+
+    // 4+ images - 2x2 grid with "+X more" overlay on 4th image
+    const displayImages = images.slice(0, 4);
+    const remaining = imageCount - 4;
+
+    return (
+      <div className="grid grid-cols-2 gap-2 mb-4 rounded-2xl overflow-hidden">
+        {displayImages.map((img, i) => (
+          <div key={i} className="relative cursor-pointer group" onClick={onClick}>
+            <img
+              src={img}
+              alt={`Post ${i + 1}`}
+              className="w-full h-32 object-cover group-hover:scale-105 transition-transform duration-300"
+            />
+            {i === 3 && remaining > 0 && (
+              <div className="absolute inset-0 bg-black/60 flex items-center justify-center hover:bg-black/70 transition-colors">
+                <span className="text-white text-2xl font-bold">+{remaining}</span>
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  // 2. Component Dropdown 3 chấm cho Post
+  const PostOptions = ({ post }: { post: PostData }) => {
+    const savedUserStr = localStorage.getItem('user');
+    const currentUserId = savedUserStr ? JSON.parse(savedUserStr)._id || JSON.parse(savedUserStr).id : null;
+    const isOwner = currentUserId && post.userId === currentUserId;
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+          <Button variant="ghost" size="icon" className="h-8 w-8 rounded-full">
+            <MoreHorizontal className="h-4 w-4" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+          {isOwner ? (
+            <>
+              <DropdownMenuItem><Edit className="w-4 h-4 mr-2" /> Edit Post</DropdownMenuItem>
+              <DropdownMenuItem className="text-red-600"><Trash2 className="w-4 h-4 mr-2" /> Delete</DropdownMenuItem>
+            </>
+          ) : (
+            <>
+              <DropdownMenuItem>📌 Save Post</DropdownMenuItem>
+              <DropdownMenuItem><Flag className="w-4 h-4 mr-2" /> Report</DropdownMenuItem>
+              <DropdownMenuItem>🙈 Hide Post</DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
+
+  // Component Dropdown 3 chấm cho Comment
+  const CommentOptions = ({ comment }: { comment: CommentData }) => {
+    const savedUserStr = localStorage.getItem('user');
+    const currentUserId = savedUserStr ? JSON.parse(savedUserStr)._id || JSON.parse(savedUserStr).id : null;
+    const isOwner = currentUserId && comment.userId === currentUserId;
+
+    return (
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+          <Button variant="ghost" size="icon" className="h-6 w-6 rounded-full">
+            <MoreHorizontal className="h-3 w-3" />
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
+          {isOwner ? (
+            <>
+              <DropdownMenuItem><Edit className="w-4 h-4 mr-2" /> Edit Comment</DropdownMenuItem>
+              <DropdownMenuItem className="text-red-600"><Trash2 className="w-4 h-4 mr-2" /> Delete</DropdownMenuItem>
+            </>
+          ) : (
+            <>
+              <DropdownMenuItem>📌 Save Comment</DropdownMenuItem>
+              <DropdownMenuItem><Flag className="w-4 h-4 mr-2" /> Report</DropdownMenuItem>
+              <DropdownMenuItem>🙈 Hide Comment</DropdownMenuItem>
+            </>
+          )}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    );
+  };
 
   const PostCard = ({ post }: { post: PostData }) => {
     const savedUserStr = localStorage.getItem('user');
@@ -463,25 +653,14 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
               </div>
             </div>
           </div>
+          <PostOptions post={post} />
         </div>
 
         {/* Content */}
         <p className="mb-3 text-sm sm:text-base text-foreground leading-relaxed whitespace-pre-wrap">{post.content}</p>
 
-        {/* --- PHẦN IMAGE (Hiển thị nếu có) --- */}
-        {post.image && (
-          <div className="mb-4 rounded-2xl overflow-hidden">
-            <img
-              src={post.image}
-              alt="Post"
-              className="w-full h-48 sm:h-64 object-cover hover:scale-105 transition-transform duration-300"
-              onError={(e) => {
-                // Fallback nếu ảnh lỗi
-                (e.target as HTMLImageElement).style.display = 'none';
-              }}
-            />
-          </div>
-        )}
+        {/* --- FACEBOOK-STYLE IMAGE GRID --- */}
+        <ImageGrid images={post.images} onClick={() => openPostDetail(post)} />
 
         <PollComponent post={post} />
         {/* Tags */}
@@ -669,28 +848,43 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
 
             {/* Filter Tabs */}
             <Tabs value={selectedTab} onValueChange={setSelectedTab}>
-              <TabsList className="grid w-full grid-cols-4 bg-muted/30">
+              <TabsList className="grid w-full grid-cols-4 bg-muted/30 p-1">
                 <TabsTrigger
                   value="all"
-                  className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:!text-white data-[state=active]:font-bold"
+                  className={`rounded-xl transition-all duration-200 ${selectedTab === 'all'
+                    ? '!bg-blue-600 !text-white shadow-md font-bold'
+                    : 'text-gray-500 hover:text-gray-900'
+                    }`}
                 >
                   All
                 </TabsTrigger>
+
                 <TabsTrigger
                   value="question"
-                  className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:!text-white data-[state=active]:font-bold"
+                  className={`rounded-xl transition-all duration-200 ${selectedTab === 'question'
+                    ? '!bg-blue-600 !text-white shadow-md font-bold'
+                    : 'text-gray-500 hover:text-gray-900'
+                    }`}
                 >
                   Questions
                 </TabsTrigger>
+
                 <TabsTrigger
                   value="poll"
-                  className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:!text-white data-[state=active]:font-bold"
+                  className={`rounded-xl transition-all duration-200 ${selectedTab === 'poll'
+                    ? '!bg-blue-600 !text-white shadow-md font-bold'
+                    : 'text-gray-500 hover:text-gray-900'
+                    }`}
                 >
                   Polls
                 </TabsTrigger>
+
                 <TabsTrigger
                   value="tip"
-                  className="rounded-xl data-[state=active]:bg-blue-600 data-[state=active]:!text-white data-[state=active]:font-bold"
+                  className={`rounded-xl transition-all duration-200 ${selectedTab === 'tip'
+                    ? '!bg-blue-600 !text-white shadow-md font-bold'
+                    : 'text-gray-500 hover:text-gray-900'
+                    }`}
                 >
                   Tips
                 </TabsTrigger>
@@ -850,48 +1044,55 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
                   className="min-h-[120px] text-base resize-none"
                 />
 
-                <div className="grid gap-4 grid-cols-1 sm:grid-cols-2">
-                  <div>
-                    <div>
-                      <Label className="text-xs text-gray-500 mb-1 block">Image (Optional)</Label>
-                      {imageUrl ? (
-                        <div className="relative mt-2">
-                          <img src={imageUrl} alt="Preview" className="w-full h-48 object-cover rounded-md" />
+                {/* Multi-Image Upload Section */}
+                <div>
+                  <Label className="text-xs text-gray-500 mb-2 block">Images (Optional, max 10)</Label>
+
+                  {/* Image Preview Grid */}
+                  {imageUrls.length > 0 && (
+                    <div className="grid grid-cols-3 gap-2 mb-3">
+                      {imageUrls.map((url, idx) => (
+                        <div key={idx} className="relative group">
+                          <img src={url} alt={`Preview ${idx + 1}`} className="w-full h-24 object-cover rounded-md" />
                           <button
-                            onClick={() => setImageUrl('')}
-                            className="absolute top-2 right-2 bg-black/50 hover:bg-black/70 text-white p-1 rounded-full"
+                            onClick={() => setImageUrls(imageUrls.filter((_, i) => i !== idx))}
+                            className="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white p-1 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
                           >
-                            <X className="w-4 h-4" />
+                            <X className="w-3 h-3" />
                           </button>
                         </div>
-                      ) : (
-                        <div className="flex items-center gap-2 mt-1">
-                          <label htmlFor="image-upload" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 rounded-md transition-all text-sm font-medium w-full justify-center border border-dashed border-gray-300">
-                            <ImageIcon className="w-4 h-4" />
-                            {isUploading ? "Uploading..." : "Upload Image"}
-                          </label>
-                          <input
-                            id="image-upload"
-                            type="file"
-                            accept="image/*"
-                            className="hidden"
-                            onChange={handleImageUpload}
-                            disabled={isUploading}
-                          />
-                          {isUploading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
-                        </div>
-                      )}
+                      ))}
                     </div>
-                  </div>
+                  )}
 
-                  <div>
-                    <Label className="text-xs text-gray-500 mb-1 block">Tags (comma separated)</Label>
-                    <Input
-                      placeholder="e.g. #Healthy, #Breakfast"
-                      value={tagsInput}
-                      onChange={(e) => setTagsInput(e.target.value)}
-                    />
-                  </div>
+                  {/* Upload Button */}
+                  {imageUrls.length < 10 && (
+                    <div className="flex items-center gap-2">
+                      <label htmlFor="post-image-upload" className="cursor-pointer flex items-center gap-2 px-4 py-2 bg-muted hover:bg-muted/80 rounded-md transition-all text-sm font-medium w-full justify-center border border-dashed border-gray-300">
+                        <ImageIcon className="w-4 h-4" />
+                        {isUploading ? `Uploading...` : `Upload Images (${imageUrls.length}/10)`}
+                      </label>
+                      <input
+                        id="post-image-upload"
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => handleMultipleImageUpload(e.target.files, 'posts')}
+                        disabled={isUploading || imageUrls.length >= 10}
+                      />
+                      {isUploading && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
+                    </div>
+                  )}
+                </div>
+
+                <div>
+                  <Label className="text-xs text-gray-500 mb-1 block">Tags (comma separated)</Label>
+                  <Input
+                    placeholder="e.g. #Healthy, #Breakfast"
+                    value={tagsInput}
+                    onChange={(e) => setTagsInput(e.target.value)}
+                  />
                 </div>
               </div>
             ) : (
@@ -954,19 +1155,25 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
                   <Avatar><div className="bg-primary text-white flex items-center justify-center w-full h-full font-bold">{selectedPost.authorAvatar}</div></Avatar>
                   <div><h4 className="font-semibold text-sm sm:text-base">{selectedPost.authorName}</h4><div className="text-[10px] sm:text-xs text-muted-foreground">{formatTimeAgo(selectedPost.createdAt)}</div></div>
                 </div>
-                <PostOptions />
+                <PostOptions post={selectedPost} />
               </div>
 
               {/* Scrollable Content */}
               <div className="flex-1 overflow-y-auto p-3 sm:p-4 custom-scrollbar">
                 <p className="mb-3 sm:mb-4 text-base sm:text-lg">{selectedPost.content}</p>
-                {selectedPost.image && (
-                  <div className="w-full mb-4 max-h-[400px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
-                    <img
-                      src={selectedPost.image}
-                      alt="Post Detail"
-                      className="w-full h-auto max-h-[400px] object-contain rounded-lg"
-                    />
+
+                {/* Full Image Gallery */}
+                {selectedPost.images && selectedPost.images.length > 0 && (
+                  <div className="mb-4 space-y-2">
+                    {selectedPost.images.map((img, idx) => (
+                      <div key={idx} className="w-full max-h-[400px] flex items-center justify-center bg-gray-50 rounded-lg overflow-hidden">
+                        <img
+                          src={img}
+                          alt={`Post Image ${idx + 1}`}
+                          className="w-full h-auto max-h-[400px] object-contain rounded-lg"
+                        />
+                      </div>
+                    ))}
                   </div>
                 )}
                 <PollComponent post={selectedPost} />
@@ -983,12 +1190,33 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
                         <div className="bg-muted/50 p-3 rounded-2xl rounded-tl-none">
                           <div className="flex justify-between items-start">
                             <span className="font-semibold text-sm">{comment.authorName}</span>
-                            <PostOptions />
+                            <CommentOptions comment={comment} />
                           </div>
                           <p className="text-sm mt-1">{comment.content}</p>
+
+                          {/* Comment Images */}
+                          {comment.images && comment.images.length > 0 && (
+                            <div className="mt-2 grid grid-cols-2 gap-1">
+                              {comment.images.map((img, imgIdx) => (
+                                <img key={imgIdx} src={img} alt={`Comment image ${imgIdx + 1}`} className="w-full h-20 object-cover rounded-md" />
+                              ))}
+                            </div>
+                          )}
                         </div>
                         <div className="flex gap-4 mt-1 ml-2 text-xs text-muted-foreground font-medium">
-                          <button className="hover:text-primary">Like</button>
+                          {(() => {
+                            const savedUserStr = localStorage.getItem('user');
+                            const currentUserId = savedUserStr ? JSON.parse(savedUserStr)._id || JSON.parse(savedUserStr).id : null;
+                            const isLiked = Array.isArray(comment.likedUserIds) && comment.likedUserIds.includes(currentUserId);
+                            return (
+                              <button
+                                className={`transition-colors ${isLiked ? 'text-red-500 hover:text-red-600 font-semibold' : 'hover:text-primary'}`}
+                                onClick={() => handleCommentLike(comment.id)}
+                              >
+                                {isLiked && '❤️ '}Like {comment.likes > 0 && `(${comment.likes})`}
+                              </button>
+                            );
+                          })()}
                           <button className="hover:text-primary" onClick={() => setReplyingTo(comment.id)}>Reply</button>
                           <span>{formatTimeAgo(comment.createdAt)}</span>
                         </div>
@@ -1023,14 +1251,60 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
                     <button onClick={() => setReplyingTo(null)} className="font-bold">Cancel</button>
                   </div>
                 )}
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Write a comment..."
-                    value={newCommentContent}
-                    onChange={(e) => setNewCommentContent(e.target.value)}
-                    className="flex-1 rounded-full bg-muted/50 border-0"
-                    onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
-                  />
+
+                {/* Comment Images Preview */}
+                {commentImageUrls.length > 0 && (
+                  <div className="flex gap-2 mb-2 overflow-x-auto pb-2">
+                    {commentImageUrls.map((url, idx) => (
+                      <div key={idx} className="relative flex-shrink-0 group">
+                        <img src={url} alt={`Comment img ${idx + 1}`} className="h-16 w-16 object-cover rounded-md" />
+                        <button
+                          onClick={() => setCommentImageUrls(commentImageUrls.filter((_, i) => i !== idx))}
+                          className="absolute -top-1 -right-1 bg-red-500 text-white p-0.5 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <div className="flex gap-2 items-end">
+                  <div className="flex-1">
+                    <Input
+                      placeholder="Write a comment..."
+                      value={newCommentContent}
+                      onChange={(e) => setNewCommentContent(e.target.value)}
+                      className="rounded-full bg-muted/50 border-0"
+                      onKeyDown={(e) => e.key === 'Enter' && handleSendComment()}
+                    />
+                  </div>
+
+                  {/* Image Upload for Comments */}
+                  {commentImageUrls.length < 10 && (
+                    <>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        type="button"
+                        className="rounded-full"
+                        disabled={isUploading}
+                        onClick={() => document.getElementById('comment-image-upload')?.click()}
+                      >
+                        <ImageIcon className="w-5 h-5" />
+                      </Button>
+                      <input
+                        id="comment-image-upload"
+                        type="file"
+                        multiple
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleMultipleImageUpload(e.target.files, 'comments')}
+                        disabled={isUploading || commentImageUrls.length >= 10}
+                      />
+                    </>
+                  )}
+
                   <Button size="icon" className="rounded-full" onClick={handleSendComment}>
                     <Send className="w-4 h-4" />
                   </Button>

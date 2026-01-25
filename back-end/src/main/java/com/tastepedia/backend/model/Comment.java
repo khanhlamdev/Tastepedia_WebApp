@@ -15,6 +15,7 @@ public class Comment {
     private String authorName;
     private String authorAvatar;
     private String content;
+    private List<String> images; // URLs của các ảnh (tối đa 10)
     private LocalDateTime createdAt;
 
     private int likes;
@@ -28,6 +29,7 @@ public class Comment {
         this.likes = 0;
         this.likedUserIds = new ArrayList<>();
         this.replies = new ArrayList<>();
+        this.images = new ArrayList<>();
     }
 
     // Getters Setters
@@ -43,6 +45,8 @@ public class Comment {
     public void setAuthorAvatar(String authorAvatar) { this.authorAvatar = authorAvatar; }
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
+    public List<String> getImages() { return images; }
+    public void setImages(List<String> images) { this.images = images; }
     public LocalDateTime getCreatedAt() { return createdAt; }
     public void setCreatedAt(LocalDateTime createdAt) { this.createdAt = createdAt; }
     public int getLikes() { return likes; }
