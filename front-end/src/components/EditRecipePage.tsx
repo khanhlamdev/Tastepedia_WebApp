@@ -15,7 +15,7 @@ import { Switch } from './ui/switch';
 
 const DIETARY_TYPES = ['Mặn', 'Chay', 'Bánh ngọt', 'Đồ uống', 'Eat Clean/Healthy', 'Không Gluten', 'Low Carb'];
 const MEAL_COURSES = ['Sáng', 'Trưa', 'Tối', 'Ăn vặt (Snack)', 'Tráng miệng', 'Khai vị'];
-const KITCHEN_TOOLS = ['Nồi chiên không dầu', 'Lò nướng', 'Máy xay sinh tố', 'Chảo chống dính', 'Nồi áp suất', 'Slow Cooker'];
+const KITCHEN_TOOLS = ['Bếp (Gas/Điện)', 'Nồi cơm điện', 'Lò vi sóng', 'Nồi chiên không dầu', 'Lò nướng', 'Máy xay sinh tố', 'Chảo chống dính', 'Nồi áp suất'];
 const ALLERGENS = ['Đậu phộng', 'Hải sản/Tôm cua', 'Sữa (Lactose)', 'Gluten', 'Trứng', 'Đậu nành', 'Các loại hạt'];
 const UNITS = ['g', 'kg', 'ml', 'l', 'thìa cafe (tsp)', 'muỗng canh (tbsp)', 'cup', 'bát/chén', 'quả/trái', 'củ', 'lát', 'nhúm', 'cái/chiếc'];
 const CUISINES = [

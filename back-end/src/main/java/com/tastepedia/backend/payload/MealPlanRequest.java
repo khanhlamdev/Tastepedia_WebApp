@@ -13,4 +13,9 @@ public class MealPlanRequest {
     private String budget;           // e.g., "Economy", "Premium"
     private String cookingTime;      // e.g., "Under 30 mins"
     private int mealsPerDay;         // e.g., 3, 4
+
+    // --- V2.0 New Filter Fields ---
+    private List<String> kitchenTools; // e.g., ["Rice Cooker", "Oven"]
+    private String preferredCuisine;   // e.g., "Vietnamese", "All"
+    private List<String> mealSchedule; // e.g., ["Breakfast", "Lunch", "Dinner"]
 }

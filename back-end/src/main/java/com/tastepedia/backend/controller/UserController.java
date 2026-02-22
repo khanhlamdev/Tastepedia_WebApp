@@ -59,13 +59,16 @@ public class UserController {
         response.put("phone", user.getPhone());
         response.put("address", user.getAddress());
         response.put("bio", user.getBio());
+        response.put("hasCompletedOnboarding", user.isHasCompletedOnboarding());
+        response.put("preferences", user.getPreferences());
 
         return ResponseEntity.ok(response);
     }
 
     // --- CẬP NHẬT THÔNG TIN PROFILE ---
+    // --- CẬP NHẬT THÔNG TIN PROFILE ---
     @PutMapping("/profile")
-    public ResponseEntity<?> updateProfile(@RequestBody Map<String, String> updates, HttpSession session) {
+    public ResponseEntity<?> updateProfile(@RequestBody Map<String, Object> updates, HttpSession session) {
         User currentUser = (User) session.getAttribute("MY_SESSION_USER");
         if (currentUser == null) {
             return ResponseEntity.status(401).body("Vui lòng đăng nhập!");
@@ -76,11 +79,25 @@ public class UserController {
             return ResponseEntity.status(404).body("Không tìm thấy user!");
         }
 
-        // Cập nhật các trường
-        if (updates.containsKey("fullName")) user.setFullName(updates.get("fullName"));
-        if (updates.containsKey("phone")) user.setPhone(updates.get("phone"));
-        if (updates.containsKey("address")) user.setAddress(updates.get("address"));
-        if (updates.containsKey("bio")) user.setBio(updates.get("bio"));
+        // Cập nhật các trường String
+        if (updates.containsKey("fullName")) user.setFullName((String) updates.get("fullName"));
+        if (updates.containsKey("phone")) user.setPhone((String) updates.get("phone"));
+        if (updates.containsKey("address")) user.setAddress((String) updates.get("address"));
+        if (updates.containsKey("bio")) user.setBio((String) updates.get("bio"));
+
+        // Cập nhật Onboarding & Preferences
+        if (updates.containsKey("hasCompletedOnboarding")) {
+             user.setHasCompletedOnboarding((Boolean) updates.get("hasCompletedOnboarding"));
+        }
+        
+        if (updates.containsKey("preferences")) {
+            try {
+                // Safe cast check needed in real prod, but usually Jackson maps JSON obj to Map
+                user.setPreferences((Map<String, Object>) updates.get("preferences"));
+            } catch (Exception e) {
+                System.out.println("Error parsing preferences: " + e.getMessage());
+            }
+        }
 
         // Không cho phép đổi Username/Email ở đây nữa (Read-only)
 

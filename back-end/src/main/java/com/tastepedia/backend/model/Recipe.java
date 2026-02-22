@@ -63,6 +63,7 @@ public class Recipe {
     // Cài đặt bài đăng (Jackson sẽ tự động map "premium" -> "isPremium")
     private boolean isPremium;
     private String visibility; // "public", "private", "subscribers"
+    private boolean isApproved = true; // Admin duyệt. Mặc định true cho demo, hệ thống thực tế có thể set false.
 
     private Date createdAt = new Date();
 

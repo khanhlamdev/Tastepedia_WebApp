@@ -106,6 +106,16 @@ public class User implements Serializable {
     public List<String> getFavoriteRecipeIds() { return favoriteRecipeIds; }
     public void setFavoriteRecipeIds(List<String> favoriteRecipeIds) { this.favoriteRecipeIds = favoriteRecipeIds; }
 
+    // --- COMMUNITY PREFERENCES ---
+    private List<String> savedPosts = new ArrayList<>();
+    private List<String> hiddenPosts = new ArrayList<>();
+
+    public List<String> getSavedPosts() { return savedPosts; }
+    public void setSavedPosts(List<String> savedPosts) { this.savedPosts = savedPosts; }
+
+    public List<String> getHiddenPosts() { return hiddenPosts; }
+    public void setHiddenPosts(List<String> hiddenPosts) { this.hiddenPosts = hiddenPosts; }
+
     // --- NEW FIELDS FOR PROFILE ---
     private String phone;
     private String address;
@@ -119,4 +129,14 @@ public class User implements Serializable {
 
     public String getBio() { return bio; }
     public void setBio(String bio) { this.bio = bio; }
+
+    // --- ONBOARDING & PREFERENCES ---
+    private boolean hasCompletedOnboarding = false;
+    private java.util.Map<String, Object> preferences;
+
+    public boolean isHasCompletedOnboarding() { return hasCompletedOnboarding; }
+    public void setHasCompletedOnboarding(boolean hasCompletedOnboarding) { this.hasCompletedOnboarding = hasCompletedOnboarding; }
+
+    public java.util.Map<String, Object> getPreferences() { return preferences; }
+    public void setPreferences(java.util.Map<String, Object> preferences) { this.preferences = preferences; }
 }

@@ -31,6 +31,11 @@ import { MyRecipesPage } from './components/MyRecipesPage';
 import { EditRecipePage } from './components/EditRecipePage';
 import { EditProfilePage } from './components/EditProfilePage';
 import { ProtectedRoute } from './components/ProtectedRoute'; // Import ProtectedRoute
+import { AdminLayout } from './components/admin/AdminLayout';
+import { AdminDashboard } from './components/admin/AdminDashboard';
+import { AdminUsers } from './components/admin/AdminUsers';
+import { AdminModeration } from './components/admin/AdminModeration';
+import { AdminRecipes } from './components/admin/AdminRecipes';
 
 export default function App() {
   const navigate = useNavigate();
@@ -98,6 +103,7 @@ export default function App() {
       case 'my-recipes': navigate('/my-recipes'); break;
       case 'edit-recipe': navigate(`/edit-recipe/${recipeId || ''}`); break;
       case 'edit-profile': navigate('/edit-profile'); break;
+      case 'admin': navigate('/admin'); break;
       default: navigate('*'); // 404
     }
     window.scrollTo(0, 0);
@@ -171,6 +177,14 @@ export default function App() {
           <Route path="/edit-recipe/:id" element={<EditRecipePage onNavigate={handleNavigate} recipeId={null} />} /> {/* recipeId handled by params in component */}
           <Route path="/create-recipe" element={<EditRecipePage onNavigate={handleNavigate} recipeId={null} />} />
           <Route path="/edit-profile" element={<EditProfilePage onNavigate={handleNavigate} />} />
+        </Route>
+
+        {/* Admin Routes */}
+        <Route path="/admin" element={<AdminLayout />}>
+          <Route index element={<AdminDashboard />} />
+          <Route path="users" element={<AdminUsers />} />
+          <Route path="moderation" element={<AdminModeration />} />
+          <Route path="recipes" element={<AdminRecipes />} />
         </Route>
 
         {/* 404 */}

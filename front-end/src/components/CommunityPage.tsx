@@ -102,16 +102,37 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
   const [commentImageUrls, setCommentImageUrls] = useState<string[]>([]); // Images for comments
   const [replyingTo, setReplyingTo] = useState<string | null>(null); // ID comment đang reply
 
+  // --- Edit & Delete State ---
+  const [editingPost, setEditingPost] = useState<PostData | null>(null);
+  const [editPostContent, setEditPostContent] = useState('');
+  const [editingComment, setEditingComment] = useState<CommentData | null>(null);
+  const [editCommentContent, setEditCommentContent] = useState('');
+
   const [showFABLabel, setShowFABLabel] = useState(true);
+
+  // --- Leaderboard Data ---
+  const [topContributors, setTopContributors] = useState<any[]>([]);
 
   useEffect(() => {
     fetchPosts();
+    fetchLeaderboard();
     const handleScroll = () => {
       setShowFABLabel(window.scrollY < 100);
     };
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
+
+  const fetchLeaderboard = async () => {
+    try {
+      const res = await fetch('http://localhost:8080/api/community/leaderboard');
+      if (res.ok) {
+        setTopContributors(await res.json());
+      }
+    } catch (err) {
+      console.error("Failed to fetch leaderboard", err);
+    }
+  };
 
   const fetchPosts = async () => {
     try {
@@ -352,48 +373,127 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     }
   };
 
-  const topContributors = [
-    {
-      id: 1,
-      name: 'Chef Minh',
-      avatar: 'CM',
-      points: 2450,
-      badge: '👨‍🍳',
-      title: 'Master Chef'
-    },
-    {
-      id: 2,
-      name: 'Sarah Parker',
-      avatar: 'SP',
-      points: 1890,
-      badge: '🌟',
-      title: 'Food Critic'
-    },
-    {
-      id: 3,
-      name: 'David Chen',
-      avatar: 'DC',
-      points: 1620,
-      badge: '🔥',
-      title: 'Recipe Creator'
-    },
-    {
-      id: 4,
-      name: 'Emma Wilson',
-      avatar: 'EW',
-      points: 1450,
-      badge: '🥇',
-      title: 'Top Helper'
-    },
-    {
-      id: 5,
-      name: 'Alex Kim',
-      avatar: 'AK',
-      points: 1280,
-      badge: '⭐',
-      title: 'Community Star'
-    },
-  ];
+  // --- Handlers for Delete & Edit ---
+  const handleDeletePost = async (postId: string) => {
+    if (!window.confirm("Are you sure you want to delete this post?")) return;
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/${postId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (res.ok) {
+        if (selectedPost && selectedPost.id === postId) setSelectedPost(null);
+        fetchPosts();
+      } else alert("Khônng thể xóa bài viết này.");
+    } catch (error) { console.error(error); }
+  };
+
+  const handleEditPostSubmit = async () => {
+    if (!editingPost || !editPostContent.trim()) return;
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/${editingPost.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content: editPostContent, images: editingPost.images, tags: editingPost.tags })
+      });
+      if (res.ok) {
+        setEditingPost(null);
+        fetchPosts();
+        if (selectedPost && selectedPost.id === editingPost.id) {
+          setSelectedPost({ ...selectedPost, content: editPostContent });
+        }
+      } else alert("Lỗi khi sửa bài viết.");
+    } catch (error) { console.error(error); }
+  };
+
+  const handleDeleteComment = async (commentId: string) => {
+    if (!window.confirm("Are you sure you want to delete this comment?")) return;
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/comments/${commentId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (res.ok) {
+        if (selectedPost) openPostDetail(selectedPost); // Refresh list
+        fetchPosts(); // Refresh comment count on post
+      } else alert("Không thể xóa bình luận.");
+    } catch (error) { console.error(error); }
+  };
+
+  const handleEditCommentSubmit = async () => {
+    if (!editingComment || !editCommentContent.trim()) return;
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/comments/${editingComment.id}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({ content: editCommentContent, images: editingComment.images })
+      });
+      if (res.ok) {
+        setEditingComment(null);
+        if (selectedPost) openPostDetail(selectedPost);
+      } else alert("Lỗi khi sửa bình luận.");
+    } catch (error) { console.error(error); }
+  };
+
+  const handleSavePost = async (postId: string) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/${postId}/save`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (res.ok) {
+        alert("Post saved successfully!");
+      } else if (res.status === 401) {
+        alert("Please login to save posts.");
+      }
+    } catch (error) { console.error(error); }
+  };
+
+  const handleHidePost = async (postId: string) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/${postId}/hide`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (res.ok) {
+        // Remove from local state
+        setPosts(prevPosts => prevPosts.filter(p => p.id !== postId));
+        alert("Post hidden.");
+      } else if (res.status === 401) {
+        alert("Please login to hide posts.");
+      }
+    } catch (error) { console.error(error); }
+  };
+
+  const handleReportPost = async (postId: string) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/${postId}/report`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (res.ok) {
+        alert("Post reported to admins. Thank you.");
+      } else if (res.status === 401) {
+        alert("Please login to report.");
+      }
+    } catch (error) { console.error(error); }
+  };
+
+  const handleReportComment = async (commentId: string) => {
+    try {
+      const res = await fetch(`http://localhost:8080/api/community/comments/${commentId}/report`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (res.ok) {
+        alert("Comment reported. Thank you.");
+      } else if (res.status === 401) {
+        alert("Please login to report.");
+      }
+    } catch (error) { console.error(error); }
+  };
 
   const PollComponent = ({ post }: { post: PostData }) => {
     if (!post.poll) return null;
@@ -552,14 +652,14 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
         <DropdownMenuContent align="end" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
           {isOwner ? (
             <>
-              <DropdownMenuItem><Edit className="w-4 h-4 mr-2" /> Edit Post</DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600"><Trash2 className="w-4 h-4 mr-2" /> Delete</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setEditingPost(post); setEditPostContent(post.content); }}><Edit className="w-4 h-4 mr-2" /> Edit Post</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDeletePost(post.id)} className="text-red-600"><Trash2 className="w-4 h-4 mr-2" /> Delete</DropdownMenuItem>
             </>
           ) : (
             <>
-              <DropdownMenuItem>📌 Save Post</DropdownMenuItem>
-              <DropdownMenuItem><Flag className="w-4 h-4 mr-2" /> Report</DropdownMenuItem>
-              <DropdownMenuItem>🙈 Hide Post</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleSavePost(post.id)}>📌 Save Post</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleReportPost(post.id)}><Flag className="w-4 h-4 mr-2" /> Report</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleHidePost(post.id)}>🙈 Hide Post</DropdownMenuItem>
             </>
           )}
         </DropdownMenuContent>
@@ -583,13 +683,13 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
         <DropdownMenuContent align="end" onClick={(e: React.MouseEvent) => e.stopPropagation()}>
           {isOwner ? (
             <>
-              <DropdownMenuItem><Edit className="w-4 h-4 mr-2" /> Edit Comment</DropdownMenuItem>
-              <DropdownMenuItem className="text-red-600"><Trash2 className="w-4 h-4 mr-2" /> Delete</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => { setEditingComment(comment); setEditCommentContent(comment.content); }}><Edit className="w-4 h-4 mr-2" /> Edit Comment</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleDeleteComment(comment.id)} className="text-red-600"><Trash2 className="w-4 h-4 mr-2" /> Delete</DropdownMenuItem>
             </>
           ) : (
             <>
               <DropdownMenuItem>📌 Save Comment</DropdownMenuItem>
-              <DropdownMenuItem><Flag className="w-4 h-4 mr-2" /> Report</DropdownMenuItem>
+              <DropdownMenuItem onClick={() => handleReportComment(comment.id)}><Flag className="w-4 h-4 mr-2" /> Report</DropdownMenuItem>
               <DropdownMenuItem>🙈 Hide Comment</DropdownMenuItem>
             </>
           )}
@@ -638,10 +738,14 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
         {/* Author Info */}
         <div className="flex items-start justify-between mb-4">
           <div className="flex items-center gap-3">
-            <Avatar className="w-12 h-12 border-2 border-primary">
-              <div className="bg-gradient-to-br from-primary to-orange-500 text-white flex items-center justify-center h-full w-full font-bold">
-                {post.authorAvatar}
-              </div>
+            <Avatar className="w-12 h-12 border-2 border-primary overflow-hidden">
+              {post.authorAvatar && post.authorAvatar.length > 2 ? (
+                <img src={post.authorAvatar} alt={post.authorName} className="w-full h-full object-cover" />
+              ) : (
+                <div className="bg-gradient-to-br from-primary to-orange-500 text-white flex items-center justify-center h-full w-full font-bold">
+                  {post.authorAvatar || post.authorName.charAt(0)}
+                </div>
+              )}
             </Avatar>
             <div>
               <div className="flex items-center gap-2">
@@ -805,10 +909,14 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
             <Card className="hidden lg:block p-3 sm:p-4 bg-gradient-to-br from-primary/5 via-orange-50/50 to-yellow-50/30 border-2 border-primary/20 shadow-lg hover:shadow-xl transition-all">
               <div className="flex gap-2 sm:gap-3">
                 {/* User Avatar */}
-                <Avatar className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-primary flex-shrink-0">
-                  <div className="bg-gradient-to-br from-primary to-orange-500 text-white flex items-center justify-center h-full w-full font-bold">
-                    {currentUser.avatar}
-                  </div>
+                <Avatar className="w-10 h-10 sm:w-12 sm:h-12 border-2 border-primary flex-shrink-0 overflow-hidden">
+                  {currentUser.avatar && currentUser.avatar.length > 2 ? (
+                    <img src={currentUser.avatar} alt={currentUser.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="bg-gradient-to-br from-primary to-orange-500 text-white flex items-center justify-center h-full w-full font-bold">
+                      {currentUser.avatar}
+                    </div>
+                  )}
                 </Avatar>
 
                 {/* Input Area */}
@@ -929,10 +1037,14 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
                     className="w-full flex items-center gap-3 p-3 rounded-2xl hover:bg-muted transition-all hover:scale-105 group"
                   >
                     <div className="relative">
-                      <Avatar className="w-12 h-12 border-2 border-primary">
-                        <div className="bg-gradient-to-br from-primary to-orange-500 text-white flex items-center justify-center h-full w-full font-bold">
-                          {contributor.avatar}
-                        </div>
+                      <Avatar className="w-12 h-12 border-2 border-primary overflow-hidden">
+                        {contributor.avatarUrl && contributor.avatarUrl.length > 2 ? (
+                          <img src={contributor.avatarUrl} alt={contributor.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="bg-gradient-to-br from-primary to-orange-500 text-white flex items-center justify-center h-full w-full font-bold">
+                            {contributor.avatarText}
+                          </div>
+                        )}
                       </Avatar>
                       {index < 3 && (
                         <div className="absolute -top-1 -right-1 w-5 h-5 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center text-xs">
@@ -1152,7 +1264,15 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
               {/* Header: Author Info */}
               <div className="flex items-center justify-between p-3 sm:p-4 border-b bg-white z-10">
                 <div className="flex items-center gap-3">
-                  <Avatar><div className="bg-primary text-white flex items-center justify-center w-full h-full font-bold">{selectedPost.authorAvatar}</div></Avatar>
+                  <Avatar className="overflow-hidden">
+                    {selectedPost.authorAvatar && selectedPost.authorAvatar.length > 2 ? (
+                      <img src={selectedPost.authorAvatar} alt={selectedPost.authorName} className="w-full h-full object-cover" />
+                    ) : (
+                      <div className="bg-primary text-white flex items-center justify-center w-full h-full font-bold">
+                        {selectedPost.authorAvatar || selectedPost.authorName.charAt(0)}
+                      </div>
+                    )}
+                  </Avatar>
                   <div><h4 className="font-semibold text-sm sm:text-base">{selectedPost.authorName}</h4><div className="text-[10px] sm:text-xs text-muted-foreground">{formatTimeAgo(selectedPost.createdAt)}</div></div>
                 </div>
                 <PostOptions post={selectedPost} />
@@ -1185,7 +1305,15 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
                 <div className="space-y-6">
                   {postComments.map(comment => (
                     <div key={comment.id} className="flex gap-3">
-                      <Avatar className="w-7 h-7 sm:w-8 sm:h-8"><div className="bg-gray-200 text-gray-600 flex items-center justify-center w-full h-full text-xs font-bold">{comment.authorAvatar}</div></Avatar>
+                      <Avatar className="w-7 h-7 sm:w-8 sm:h-8 overflow-hidden">
+                        {comment.authorAvatar && comment.authorAvatar.length > 2 ? (
+                          <img src={comment.authorAvatar} alt={comment.authorName} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className="bg-gray-200 text-gray-600 flex items-center justify-center w-full h-full text-xs font-bold">
+                            {comment.authorAvatar || comment.authorName.charAt(0)}
+                          </div>
+                        )}
+                      </Avatar>
                       <div className="flex-1">
                         <div className="bg-muted/50 p-3 rounded-2xl rounded-tl-none">
                           <div className="flex justify-between items-start">
@@ -1226,7 +1354,15 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
                           <div className="mt-3 space-y-3 pl-3 border-l-2 border-border ml-2">
                             {comment.replies.map(reply => (
                               <div key={reply.id} className="flex gap-3">
-                                <Avatar className="w-6 h-6"><div className="bg-gray-200 w-full h-full flex items-center justify-center text-[10px]">{reply.authorAvatar}</div></Avatar>
+                                <Avatar className="w-6 h-6 overflow-hidden">
+                                  {reply.authorAvatar && reply.authorAvatar.length > 2 ? (
+                                    <img src={reply.authorAvatar} alt={reply.authorName} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <div className="bg-gray-200 w-full h-full flex items-center justify-center text-[10px]">
+                                      {reply.authorAvatar || reply.authorName.charAt(0)}
+                                    </div>
+                                  )}
+                                </Avatar>
                                 <div>
                                   <div className="bg-muted/30 p-2 rounded-xl">
                                     <span className="font-semibold text-xs">{reply.authorName}</span>
@@ -1312,6 +1448,46 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* --- EDIT POST DIALOG --- */}
+      <Dialog open={!!editingPost} onOpenChange={() => setEditingPost(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Post</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={editPostContent}
+              onChange={(e) => setEditPostContent(e.target.value)}
+              className="min-h-[150px] resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setEditingPost(null)}>Cancel</Button>
+            <Button onClick={handleEditPostSubmit}>Save Changes</Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* --- EDIT COMMENT DIALOG --- */}
+      <Dialog open={!!editingComment} onOpenChange={() => setEditingComment(null)}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Edit Comment</DialogTitle>
+          </DialogHeader>
+          <div className="py-4">
+            <Textarea
+              value={editCommentContent}
+              onChange={(e) => setEditCommentContent(e.target.value)}
+              className="resize-none"
+            />
+          </div>
+          <div className="flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setEditingComment(null)}>Cancel</Button>
+            <Button onClick={handleEditCommentSubmit}>Save Changes</Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
