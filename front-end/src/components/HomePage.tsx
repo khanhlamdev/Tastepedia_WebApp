@@ -1,4 +1,4 @@
-'use client';
+﻿'use client';
 
 import { useState, useEffect } from 'react';
 import { Star, Clock, Heart, CheckCircle, Users, Award, TrendingUp, Truck, MessageSquare, Smile, Meh, Frown, X, Utensils, Store, MessageCircle, Sparkles, Video } from 'lucide-react';
@@ -9,9 +9,22 @@ import { Card } from './ui//card';
 import { Header } from './layout/Header';
 import { HeroSlider } from './HeroSlider';
 import { Footer } from './layout/Footer';
+import { useNavigate } from 'react-router-dom';
 
+// Type Definitions
 interface HomePageProps {
   onNavigate: (page: string, recipeId?: string) => void;
+}
+
+interface Recipe {
+  id: string; // Map from _id
+  title: string;
+  mainImageUrl: string;
+  cookTime: number;
+  totalCost: number;
+  videoUrl?: string; // NEW
+  // Mock fields for UI
+  rating?: number;
 }
 
 // Mock Data for Testimonials
@@ -200,23 +213,6 @@ const categories = [
   },
 ];
 
-// --- FETCH DATA FROM BACKEND ---
-interface Recipe {
-  id: string; // Map from _id
-  title: string;
-  mainImageUrl: string;
-  cookTime: number;
-  totalCost: number;
-  videoUrl?: string; // NEW
-  // Mock fields for UI
-  rating?: number;
-}
-
-import { useNavigate } from 'react-router-dom';
-
-interface HomePageProps {
-  onNavigate?: (page: string, recipeId?: string) => void; // Legacy
-}
 
 export function HomePage({ onNavigate }: HomePageProps) {
   const navigate = useNavigate();
@@ -231,6 +227,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
   ];
 
   const [trendingRecipes, setTrendingRecipes] = useState<Recipe[]>([]);
+  const [recommendedRecipes, setRecommendedRecipes] = useState<Recipe[]>([]);
 
   useEffect(() => {
     const fetchRecipes = async () => {
@@ -255,7 +252,32 @@ export function HomePage({ onNavigate }: HomePageProps) {
         // Fallback to empty or keep loading
       }
     };
+
+    const fetchRecommendedRecipes = async () => {
+      try {
+        const res = await fetch('http://localhost:8080/api/recipes/recommended', {
+          credentials: 'include' // Send session cookie
+        });
+        const data = await res.json();
+
+        const mappedRecipes = data.map((item: any) => ({
+          id: item.id || item._id,
+          title: item.title,
+          mainImageUrl: item.mainImageUrl || "https://images.unsplash.com/photo-1546069901-ba9599a7e63c",
+          cookTime: item.cookTime,
+          totalCost: item.totalCost,
+          videoUrl: item.videoUrl,
+          rating: 4.5 + Math.random() * 0.5
+        }));
+
+        setRecommendedRecipes(mappedRecipes);
+      } catch (error) {
+        console.error("Failed to fetch recommended recipes", error);
+      }
+    };
+
     fetchRecipes();
+    fetchRecommendedRecipes();
   }, []);
 
   const handleCategoryClick = (categoryId: string) => {
@@ -382,7 +404,6 @@ export function HomePage({ onNavigate }: HomePageProps) {
             {/* Content Overlay */}
             <div className="relative h-full flex flex-col justify-end p-8 md:p-10 text-white">
               <div className="mb-4 inline-flex items-center gap-2 bg-white/20 backdrop-blur-md px-4 py-2 rounded-full w-fit">
-                <Sparkles className="w-4 h-4" />
                 <span className="text-sm font-semibold">AI Powered</span>
               </div>
 
@@ -419,7 +440,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
               {trendingRecipes.length === 0 && (
                 <div className="col-span-full text-center py-12 text-gray-500">
-                  Chưa có công thức nào. Vui lòng kiểm tra kết nối backend!
+                  ChÆ°a cÃ³ cÃ´ng thá»©c nÃ o. Vui lÃ²ng kiá»ƒm tra káº¿t ná»‘i backend!
                 </div>
               )}
               {trendingRecipes.map((recipe) => (
@@ -437,7 +458,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
                     <div className="absolute top-3 left-3">
                       {recipe.videoUrl && (
                         <Badge className="bg-red-500/90 backdrop-blur-sm text-white border-0 flex items-center gap-1 mb-2">
-                          <Video className="w-3 h-3" /> Video hướng dẫn
+                          <Video className="w-3 h-3" /> Video hÆ°á»›ng dáº«n
                         </Badge>
                       )}
                     </div>
@@ -465,6 +486,65 @@ export function HomePage({ onNavigate }: HomePageProps) {
               ))}
             </div>
           </div>
+
+          {/* RECOMMENDED FOR YOU */}
+          {recommendedRecipes.length > 0 && (
+            <div className="mb-12">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+                    <Sparkles className="w-6 h-6 text-[#FF6B35]" />
+                    Recommended For You
+                  </h2>
+                  <p className="text-gray-600 text-sm mt-1">Based on your preferences</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+                {recommendedRecipes.map((recipe) => (
+                  <button
+                    key={recipe.id}
+                    onClick={() => onNavigate('recipe', recipe.id)}
+                    className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                  >
+                    <div className="relative aspect-[4/3] overflow-hidden">
+                      <img
+                        src={recipe.mainImageUrl || "/placeholder.svg"}
+                        alt={recipe.title}
+                        className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      />
+                      <div className="absolute top-3 left-3">
+                        {recipe.videoUrl && (
+                          <Badge className="bg-red-500/90 backdrop-blur-sm text-white border-0 flex items-center gap-1 mb-2">
+                            <Video className="w-3 h-3" /> Video hÆ°á»›ng dáº«n
+                          </Badge>
+                        )}
+                      </div>
+                      <button className="absolute top-3 right-3 p-2 bg-white/90 backdrop-blur-sm rounded-full hover:bg-white transition-colors">
+                        <Heart className="w-5 h-5 text-gray-700" />
+                      </button>
+                      <Badge className="absolute bottom-3 left-3 bg-[#4CAF50] text-white">
+                        ${recipe.totalCost}
+                      </Badge>
+                    </div>
+                    <div className="p-4">
+                      <h3 className="font-semibold text-lg mb-2 text-left">{recipe.title}</h3>
+                      <div className="flex items-center justify-between text-sm text-gray-600">
+                        <div className="flex items-center gap-1">
+                          <Star className="w-4 h-4 fill-[#FFB800] text-[#FFB800]" />
+                          <span className="font-medium">{recipe.rating?.toFixed(1)}</span>
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <Clock className="w-4 h-4" />
+                          <span>{recipe.cookTime} mins</span>
+                        </div>
+                      </div>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* TESTIMONIALS SECTION - "What Foodies Say" */}
           <div className="mb-12">
@@ -518,6 +598,6 @@ export function HomePage({ onNavigate }: HomePageProps) {
 
       {/* Footer */}
       <Footer onNavigate={onNavigate} />
-    </div >
+    </div>
   );
 }

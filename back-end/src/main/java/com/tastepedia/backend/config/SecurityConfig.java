@@ -28,7 +28,10 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable()) // Tắt CSRF
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**", "/api/recipes/**", "/api/favorites/**").permitAll()
-                        .requestMatchers("/api/community/**", "/api/reviews/**", "/api/users/**", "/api/ai/**").permitAll()// Tạm thời cho phép tất cả vào recipe để test (hoặc chỉnh lại sau)
+                        .requestMatchers("/api/community/**", "/api/reviews/**", "/api/users/**", "/api/ai/**").permitAll()
+                        // Admin routes: permitAll ở đây để pass qua Spring Security,
+                        // logic kiểm tra quyền ADMIN được xử lý bên trong AdminController qua session
+                        .requestMatchers("/api/admin/**").permitAll()
                         .anyRequest().authenticated()
                 );
 

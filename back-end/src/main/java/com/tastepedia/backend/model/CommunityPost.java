@@ -28,6 +28,7 @@ public class CommunityPost {
     private int likes;
     private int comments;
     private List<String> likedUserIds; // Danh sách ID người đã like
+    private int reportCount; // Số lượng người dùng báo cáo (Report) bài viết vi phạm
 
     // Dành riêng cho Poll
     private PollData poll;
@@ -36,6 +37,7 @@ public class CommunityPost {
         this.createdAt = LocalDateTime.now();
         this.likes = 0;
         this.comments = 0;
+        this.reportCount = 0;
         this.tags = new ArrayList<>();
         this.likedUserIds = new ArrayList<>();
         this.images = new ArrayList<>();
@@ -110,4 +112,6 @@ public class CommunityPost {
     public void setPoll(PollData poll) { this.poll = poll; }
     public List<String> getLikedUserIds() { return likedUserIds; }
     public void setLikedUserIds(List<String> likedUserIds) { this.likedUserIds = likedUserIds; }
+    public int getReportCount() { return reportCount; }
+    public void setReportCount(int reportCount) { this.reportCount = reportCount; }
 }

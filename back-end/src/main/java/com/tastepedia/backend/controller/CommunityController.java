@@ -27,6 +27,9 @@ public class CommunityController {
     private CommunityPostRepository postRepository;
 
     @Autowired
+    private com.tastepedia.backend.repository.UserRepository userRepository;
+
+    @Autowired
     private CloudinaryService cloudinaryService;
 
     @PostMapping("/upload")
@@ -68,9 +71,18 @@ public class CommunityController {
 
         post.setUserId(currentUser.getId());
         post.setAuthorName(currentUser.getFullName());
-        //post.setAuthorAvatar(currentUser.getAvatar() != null ? currentUser.getAvatar() : "U");
-        post.setAuthorAvatar("U");
-        post.setAuthorBadge("Member");
+        
+        // Sử dụng ảnh đại diện thật của User, nếu không có thì gán mặc định chuỗi rỗng
+        post.setAuthorAvatar(currentUser.getProfileImageUrl() != null && !currentUser.getProfileImageUrl().isEmpty() ? currentUser.getProfileImageUrl() : "");
+        
+        // Xác định Badge dựa vào Role
+        String badge = "Member";
+        if ("CREATOR".equalsIgnoreCase(currentUser.getRole())) {
+            badge = "Home Cook";
+        } else if ("ADMIN".equalsIgnoreCase(currentUser.getRole())) {
+            badge = "Admin";
+        }
+        post.setAuthorBadge(badge);
 
         if (post.getPoll() != null) {
             post.getPoll().setTotalVotes(0);
@@ -78,6 +90,119 @@ public class CommunityController {
 
         CommunityPost savedPost = postRepository.save(post);
         return ResponseEntity.ok(savedPost);
+    }
+
+    // --- SỬA BÀI VIẾT (EDIT POST) ---
+    @PutMapping("/{postId}")
+    public ResponseEntity<?> updatePost(@PathVariable String postId, @RequestBody CommunityPost updatedPost, HttpSession session) {
+        User currentUser = (User) session.getAttribute("MY_SESSION_USER");
+        if (currentUser == null) return ResponseEntity.status(401).body("Unauthorized");
+
+        Optional<CommunityPost> postOpt = postRepository.findById(postId);
+        if (postOpt.isPresent()) {
+            CommunityPost post = postOpt.get();
+            // CHỈ cho phép chính chủ sửa bài
+            if (!post.getUserId().equals(currentUser.getId())) {
+                return ResponseEntity.status(403).body("Forbidden: You can only edit your own posts.");
+            }
+            
+            // Cập nhật nội dung (Không cho sửa Poll hoặc loại bài)
+            post.setContent(updatedPost.getContent());
+            if (updatedPost.getImages() != null) {
+                if (updatedPost.getImages().size() > 10) return ResponseEntity.badRequest().body("Max 10 images.");
+                post.setImages(updatedPost.getImages());
+            }
+            if (updatedPost.getTags() != null) post.setTags(updatedPost.getTags());
+
+            return ResponseEntity.ok(postRepository.save(post));
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    // --- XÓA BÀI VIẾT (DELETE POST) ---
+    @DeleteMapping("/{postId}")
+    public ResponseEntity<?> deletePost(@PathVariable String postId, HttpSession session) {
+        User currentUser = (User) session.getAttribute("MY_SESSION_USER");
+        if (currentUser == null) return ResponseEntity.status(401).body("Unauthorized");
+
+        Optional<CommunityPost> postOpt = postRepository.findById(postId);
+        if (postOpt.isPresent()) {
+            CommunityPost post = postOpt.get();
+            // CHỈ User tạo bài HOẶC Admin mới được xóa
+            if (!post.getUserId().equals(currentUser.getId()) && !"ADMIN".equalsIgnoreCase(currentUser.getRole())) {
+                return ResponseEntity.status(403).body("Forbidden: You cannot delete this post.");
+            }
+
+            postRepository.deleteById(postId);
+            // Có thể thêm logic xóa luôn các comment thuộc về post này
+            List<Comment> relatedComments = commentRepository.findByPostIdOrderByCreatedAtDesc(postId);
+            for (Comment c : relatedComments) {
+                commentRepository.deleteById(c.getId());
+            }
+
+            return ResponseEntity.ok().body("Post deleted successfully.");
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    // --- LƯU BÀI VIẾT (SAVE POST) ---
+    @PostMapping("/{postId}/save")
+    public ResponseEntity<?> savePost(@PathVariable String postId, HttpSession session) {
+        User currentUser = (User) session.getAttribute("MY_SESSION_USER");
+        if (currentUser == null) return ResponseEntity.status(401).body("Unauthorized");
+
+        Optional<User> userOpt = userRepository.findById(currentUser.getId());
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            if (user.getSavedPosts() == null) user.setSavedPosts(new ArrayList<>());
+            
+            if (user.getSavedPosts().contains(postId)) {
+                user.getSavedPosts().remove(postId); // Bỏ lưu
+            } else {
+                user.getSavedPosts().add(postId); // Lưu mới
+            }
+            userRepository.save(user);
+            session.setAttribute("MY_SESSION_USER", user); // Cập nhật session
+            return ResponseEntity.ok(Map.of("message", "Success", "savedPosts", user.getSavedPosts()));
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    // --- ẨN BÀI VIẾT (HIDE POST) ---
+    @PostMapping("/{postId}/hide")
+    public ResponseEntity<?> hidePost(@PathVariable String postId, HttpSession session) {
+        User currentUser = (User) session.getAttribute("MY_SESSION_USER");
+        if (currentUser == null) return ResponseEntity.status(401).body("Unauthorized");
+
+        Optional<User> userOpt = userRepository.findById(currentUser.getId());
+        if (userOpt.isPresent()) {
+            User user = userOpt.get();
+            if (user.getHiddenPosts() == null) user.setHiddenPosts(new ArrayList<>());
+            
+            if (!user.getHiddenPosts().contains(postId)) {
+                user.getHiddenPosts().add(postId);
+                userRepository.save(user);
+                session.setAttribute("MY_SESSION_USER", user);
+            }
+            return ResponseEntity.ok(Map.of("message", "Post hidden successfully"));
+        }
+        return ResponseEntity.notFound().build();
+    }
+
+    // --- REPORT BÀI VIẾT (REPORT POST) ---
+    @PostMapping("/{postId}/report")
+    public ResponseEntity<?> reportPost(@PathVariable String postId, HttpSession session) {
+        User currentUser = (User) session.getAttribute("MY_SESSION_USER");
+        if (currentUser == null) return ResponseEntity.status(401).body("Unauthorized");
+
+        Optional<CommunityPost> postOpt = postRepository.findById(postId);
+        if (postOpt.isPresent()) {
+            CommunityPost post = postOpt.get();
+            post.setReportCount(post.getReportCount() + 1);
+            postRepository.save(post);
+            return ResponseEntity.ok(Map.of("message", "Post reported successfully", "reportCount", post.getReportCount()));
+        }
+        return ResponseEntity.notFound().build();
     }
 
     @PutMapping("/{postId}/like")
@@ -138,6 +263,22 @@ public class CommunityController {
     @Autowired
     private CommentRepository commentRepository;
 
+    // --- REPORT COMMENT (REPORT COMMENT) ---
+    @PostMapping("/comments/{commentId}/report")
+    public ResponseEntity<?> reportComment(@PathVariable String commentId, HttpSession session) {
+        User currentUser = (User) session.getAttribute("MY_SESSION_USER");
+        if (currentUser == null) return ResponseEntity.status(401).body("Unauthorized");
+
+        Optional<Comment> commentOpt = commentRepository.findById(commentId);
+        if (commentOpt.isPresent()) {
+            Comment comment = commentOpt.get();
+            comment.setReportCount(comment.getReportCount() + 1);
+            commentRepository.save(comment);
+            return ResponseEntity.ok(Map.of("message", "Comment reported successfully", "reportCount", comment.getReportCount()));
+        }
+        return ResponseEntity.notFound().build();
+    }
+
     // --- API VOTE POLL ---
     @PostMapping("/{postId}/vote")
     public ResponseEntity<?> votePoll(@PathVariable String postId, @RequestParam int optionId, HttpSession session) {
@@ -180,6 +321,73 @@ public class CommunityController {
         return ResponseEntity.notFound().build();
     }
 
+    // --- BẢNG XẾP HẠNG (LEADERBOARD) ---
+    @GetMapping("/leaderboard")
+    public ResponseEntity<?> getLeaderboard() {
+        List<User> allUsers = userRepository.findAll();
+        List<Map<String, Object>> leaderboard = new ArrayList<>();
+
+        for (User user : allUsers) {
+            int totalPoints = 0;
+            String userId = user.getId();
+
+            // Tính điểm từ Bài viết (10 điểm/bài + 1 điểm/like)
+            List<CommunityPost> userPosts = postRepository.findAll().stream()
+                .filter(p -> userId.equals(p.getUserId()))
+                .toList();
+            
+            totalPoints += userPosts.size() * 10;
+            for (CommunityPost p : userPosts) {
+                totalPoints += p.getLikes();
+            }
+
+            // Tính điểm từ Bình luận (5 điểm/bình luận + 1 điểm/like)
+            List<Comment> userComments = commentRepository.findAll().stream()
+                .filter(c -> userId.equals(c.getUserId()))
+                .toList();
+
+            totalPoints += userComments.size() * 5;
+            for (Comment c : userComments) {
+                totalPoints += c.getLikes();
+            }
+
+            // Chỉ lấy người có điểm > 0
+            if (totalPoints > 0) {
+                Map<String, Object> userStats = new HashMap<>();
+                userStats.put("id", userId);
+                userStats.put("name", user.getFullName());
+                
+                String avatarUrl = user.getProfileImageUrl();
+                userStats.put("avatarUrl", (avatarUrl != null && !avatarUrl.isEmpty()) ? avatarUrl : "");
+                userStats.put("avatarText", user.getFullName().substring(0, 1).toUpperCase());
+                
+                userStats.put("points", totalPoints);
+
+                String badge = "Member";
+                String title = "Foodie";
+                if ("CREATOR".equalsIgnoreCase(user.getRole())) {
+                    badge = "👨‍🍳";
+                    title = "Home Cook";
+                } else if ("ADMIN".equalsIgnoreCase(user.getRole())) {
+                    badge = "👑";
+                    title = "Admin";
+                } else {
+                    if (totalPoints > 100) { badge = "🔥"; title = "Rising Star"; }
+                    if (totalPoints > 500) { badge = "🌟"; title = "Master Chef"; }
+                }
+
+                userStats.put("badge", badge);
+                userStats.put("title", title);
+
+                leaderboard.add(userStats);
+            }
+        }
+
+        // Sắp xếp giảm dần theo điểm và lấy Top 5
+        leaderboard.sort((a, b) -> (Integer) b.get("points") - (Integer) a.get("points"));
+        return ResponseEntity.ok(leaderboard.size() > 5 ? leaderboard.subList(0, 5) : leaderboard);
+    }
+
     // --- API LẤY COMMENT ---
     @GetMapping("/{postId}/comments")
     public List<Comment> getComments(@PathVariable String postId) {
@@ -216,8 +424,7 @@ public class CommunityController {
                 reply.setPostId(postId);
                 reply.setUserId(currentUser.getId());
                 reply.setAuthorName(currentUser.getFullName());
-                //reply.setAuthorAvatar(currentUser.getAvatar() != null ? currentUser.getAvatar() : "U");
-                reply.setAuthorAvatar("U");
+                reply.setAuthorAvatar(currentUser.getProfileImageUrl() != null && !currentUser.getProfileImageUrl().isEmpty() ? currentUser.getProfileImageUrl() : "");
                 reply.setContent(content);
                 if (images != null) {
                     reply.setImages(images);
@@ -237,8 +444,7 @@ public class CommunityController {
             comment.setPostId(postId);
             comment.setUserId(currentUser.getId());
             comment.setAuthorName(currentUser.getFullName());
-            //comment.setAuthorAvatar(currentUser.getAvatar() != null ? currentUser.getAvatar() : "U");
-            comment.setAuthorAvatar("U");
+            comment.setAuthorAvatar(currentUser.getProfileImageUrl() != null && !currentUser.getProfileImageUrl().isEmpty() ? currentUser.getProfileImageUrl() : "");
             comment.setContent(content);
             if (images != null) {
                 comment.setImages(images);
@@ -249,6 +455,57 @@ public class CommunityController {
             return ResponseEntity.ok(saved);
         }
         return ResponseEntity.badRequest().build();
+    }
+
+    // --- SỬA COMMENT (EDIT COMMENT) ---
+    @PutMapping("/comments/{commentId}")
+    public ResponseEntity<?> updateComment(@PathVariable String commentId, @RequestBody Map<String, Object> payload, HttpSession session) {
+        User currentUser = (User) session.getAttribute("MY_SESSION_USER");
+        if (currentUser == null) return ResponseEntity.status(401).body("Unauthorized");
+
+        Optional<Comment> commentOpt = commentRepository.findById(commentId);
+        if (commentOpt.isPresent()) {
+            Comment comment = commentOpt.get();
+            if (!comment.getUserId().equals(currentUser.getId())) {
+                return ResponseEntity.status(403).body("Forbidden: You can only edit your own comments.");
+            }
+
+            String content = (String) payload.get("content");
+            @SuppressWarnings("unchecked")
+            List<String> images = (List<String>) payload.get("images");
+
+            if (content != null) comment.setContent(content);
+            if (images != null) {
+                if (images.size() > 10) return ResponseEntity.badRequest().body("Max 10 images.");
+                comment.setImages(images);
+            }
+
+            return ResponseEntity.ok(commentRepository.save(comment));
+        }
+        // Thử tìm trong replies (nested comment) nếu không thấy ở top-level (Phức tạp hơn, tạm thời chỉ hỗ trợ edit top-level)
+        return ResponseEntity.notFound().build();
+    }
+
+    // --- XÓA COMMENT (DELETE COMMENT) ---
+    @DeleteMapping("/comments/{commentId}")
+    public ResponseEntity<?> deleteComment(@PathVariable String commentId, HttpSession session) {
+        User currentUser = (User) session.getAttribute("MY_SESSION_USER");
+        if (currentUser == null) return ResponseEntity.status(401).body("Unauthorized");
+
+        Optional<Comment> commentOpt = commentRepository.findById(commentId);
+        if (commentOpt.isPresent()) {
+            Comment comment = commentOpt.get();
+            if (!comment.getUserId().equals(currentUser.getId()) && !"ADMIN".equalsIgnoreCase(currentUser.getRole())) {
+                return ResponseEntity.status(403).body("Forbidden: You cannot delete this comment.");
+            }
+
+            String postId = comment.getPostId();
+            commentRepository.deleteById(commentId);
+            updatePostCommentCount(postId, -1);
+            
+            return ResponseEntity.ok().body("Comment deleted successfully.");
+        }
+        return ResponseEntity.notFound().build();
     }
 
     private void updatePostCommentCount(String postId, int delta) {

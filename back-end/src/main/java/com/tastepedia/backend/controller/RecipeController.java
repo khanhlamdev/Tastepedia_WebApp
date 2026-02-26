@@ -118,6 +118,134 @@ public class RecipeController {
         return ResponseEntity.ok(latestRecipes);
     }
 
+    // --- API GỢI Ý DỰA TRÊN SỞ THÍCH USER (ONBOARDING) ---
+    @GetMapping("/recommended")
+    public ResponseEntity<List<Recipe>> getRecommendedRecipes(HttpSession session) {
+        User currentUser = (User) session.getAttribute("MY_SESSION_USER");
+        
+        // Nếu chưa login hoặc chưa có preferences, trả về random
+        if (currentUser == null || currentUser.getPreferences() == null) {
+            List<Recipe> randomRecipes = recipeRepository.findTop6ByOrderByCreatedAtDesc();
+            return ResponseEntity.ok(randomRecipes);
+        }
+
+        java.util.Map<String, Object> prefs = currentUser.getPreferences();
+        
+        // Lấy tất cả recipes
+        List<Recipe> allRecipes = recipeRepository.findAll();
+        List<Recipe> recommended = new ArrayList<>();
+
+        for (Recipe recipe : allRecipes) {
+            boolean matches = true;
+
+            // 1. Filter by Diet
+            if (prefs.get("diet") != null) {
+                String userDiet = prefs.get("diet").toString().toLowerCase();
+                List<String> recipeDiets = recipe.getDietaryType();
+                
+                // Mapping logic - check if recipe's dietary types match user's preference
+                if (recipeDiets != null && !recipeDiets.isEmpty()) {
+                    boolean dietMatches = false;
+                    
+                    for (String recipeDiet : recipeDiets) {
+                        String recipeDietLower = recipeDiet.toLowerCase();
+                        
+                        if ("vegetarian".equals(userDiet)) {
+                            if (recipeDietLower.contains("vegetarian") || recipeDietLower.contains("vegan")) {
+                                dietMatches = true;
+                                break;
+                            }
+                        } else if ("vegan".equals(userDiet)) {
+                            if (recipeDietLower.contains("vegan")) {
+                                dietMatches = true;
+                                break;
+                            }
+                        } else if ("keto".equals(userDiet)) {
+                            if (recipeDietLower.contains("keto") || recipeDietLower.contains("low-carb")) {
+                                dietMatches = true;
+                                break;
+                            }
+                        } else {
+                            // For omnivore or other diets, accept all
+                            dietMatches = true;
+                            break;
+                        }
+                    }
+                    
+                    if (!dietMatches && !"omnivore".equals(userDiet)) {
+                        matches = false;
+                    }
+                }
+            }
+
+            // 2. Filter by Allergies
+            if (prefs.get("allergies") != null) {
+                @SuppressWarnings("unchecked")
+                List<String> userAllergies = (List<String>) prefs.get("allergies");
+                List<String> recipeAllergens = recipe.getAllergens();
+                
+                if (recipeAllergens != null) {
+                    for (String allergy : userAllergies) {
+                        if (recipeAllergens.stream().anyMatch(a -> 
+                            a.toLowerCase().contains(allergy.toLowerCase()))) {
+                            matches = false;
+                            break;
+                        }
+                    }
+                }
+            }
+
+            // 3. Prioritize by Cuisine (but don't exclude)
+            // We'll sort by matching cuisine later instead of filtering here
+
+            if (matches) {
+                recommended.add(recipe);
+            }
+        }
+
+        // Sort by cuisine match (preferred cuisines first)
+        if (prefs.get("cuisines") != null) {
+            @SuppressWarnings("unchecked")
+            List<String> userCuisines = (List<String>) prefs.get("cuisines");
+            recommended.sort((r1, r2) -> {
+                boolean r1Match = userCuisines.stream().anyMatch(cuisineCode -> 
+                    matchesCuisine(r1.getCuisine(), cuisineCode));
+                boolean r2Match = userCuisines.stream().anyMatch(cuisineCode -> 
+                    matchesCuisine(r2.getCuisine(), cuisineCode));
+                
+                if (r1Match && !r2Match) return -1;
+                if (!r1Match && r2Match) return 1;
+                return 0;
+            });
+        }
+
+        // Return top 6
+        return ResponseEntity.ok(recommended.stream().limit(6).toList());
+    }
+
+    // Helper method to map cuisine codes to full names
+    private boolean matchesCuisine(String recipeCuisine, String cuisineCode) {
+        if (recipeCuisine == null || cuisineCode == null) return false;
+        
+        String cuisineLower = recipeCuisine.toLowerCase();
+        String code = cuisineCode.toLowerCase();
+        
+        // Mapping from onboarding codes to recipe cuisine names
+        return switch (code) {
+            case "vn" -> cuisineLower.contains("viet") || cuisineLower.contains("vietnam");
+            case "it" -> cuisineLower.contains("ital");
+            case "jp" -> cuisineLower.contains("japan");
+            case "kr" -> cuisineLower.contains("korea");
+            case "cn" -> cuisineLower.contains("chin");
+            case "in" -> cuisineLower.contains("india");
+            case "th" -> cuisineLower.contains("thai");
+            case "mx" -> cuisineLower.contains("mexican");
+            case "fr" -> cuisineLower.contains("french");
+            case "us" -> cuisineLower.contains("american");
+            default -> false;
+        };
+    }
+
     // --- API CHI TIẾT BÀI ĐĂNG ---
     @GetMapping("/{id}")
     public ResponseEntity<?> getRecipeById(@PathVariable String id) {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { ArrowLeft, User, Heart, ShoppingBag, Settings, ChefHat, Trophy, Users, MapPin, CreditCard, Bell, LogOut, Wallet, ChevronRight, MessageCircle, Phone } from 'lucide-react';
+import { ArrowLeft, Heart, ShoppingBag, Settings, ChefHat, Trophy, MapPin, Wallet, ChevronRight, MessageCircle, Phone, ShieldAlert } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
@@ -310,6 +310,17 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
               <h3 className="text-xl font-bold mb-4">Account Settings</h3>
 
               <div className="space-y-1">
+                {user.role === 'ADMIN' && (
+                  <button
+                    onClick={() => onNavigate('admin')}
+                    className="w-full flex items-center gap-3 p-4 hover:bg-slate-50 rounded-xl transition-colors mb-2 border border-slate-200"
+                  >
+                    <ShieldAlert className="w-5 h-5 text-red-600" />
+                    <span className="flex-1 text-left font-bold text-red-600">Admin Dashboard</span>
+                    <ChevronRight className="w-5 h-5 text-slate-400" />
+                  </button>
+                )}
+
                 <button
                   onClick={() => onNavigate('favorites')}
                   className="w-full flex items-center gap-3 p-4 hover:bg-gray-50 rounded-xl transition-colors"

@@ -20,6 +20,7 @@ public class Comment {
 
     private int likes;
     private List<String> likedUserIds;
+    private int reportCount; // Theo dõi số lượng báo cáo vi phạm
 
     // Hỗ trợ trả lời bình luận (Reply)
     private List<Comment> replies;
@@ -27,6 +28,7 @@ public class Comment {
     public Comment() {
         this.createdAt = LocalDateTime.now();
         this.likes = 0;
+        this.reportCount = 0;
         this.likedUserIds = new ArrayList<>();
         this.replies = new ArrayList<>();
         this.images = new ArrayList<>();
@@ -55,4 +57,6 @@ public class Comment {
     public void setLikedUserIds(List<String> likedUserIds) { this.likedUserIds = likedUserIds; }
     public List<Comment> getReplies() { return replies; }
     public void setReplies(List<Comment> replies) { this.replies = replies; }
+    public int getReportCount() { return reportCount; }
+    public void setReportCount(int reportCount) { this.reportCount = reportCount; }
 }
