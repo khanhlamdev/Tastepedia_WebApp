@@ -1,280 +1,262 @@
-import { ArrowLeft, Phone, MessageCircle, CheckCircle2, Package, Truck, MapPin } from 'lucide-react';
+import { useState, useEffect, useCallback } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import axios from 'axios';
+import { ArrowLeft, Package, CheckCircle2, Truck, ShoppingBag, Clock, XCircle } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
-import { Avatar } from './ui/avatar';
 
-interface OrderTrackingPageProps {
-  onNavigate: (page: string) => void;
+const API_URL = 'http://localhost:8080/api';
+
+interface OrderItem { name: string; qty: number; price: number; }
+interface Order {
+  id: string; storeId: string; storeName: string;
+  userFullName: string; userAddress: string;
+  items: OrderItem[]; totalAmount: number; paymentMethod: string; note?: string;
+  status: string; createdAt: string; updatedAt: string;
 }
 
-export function OrderTrackingPage({ onNavigate }: OrderTrackingPageProps) {
-  const orderStatus = {
-    currentStep: 3,
-    steps: [
-      { id: 1, label: 'Order Placed', time: '2:30 PM', completed: true },
-      { id: 2, label: 'Preparing', time: '2:45 PM', completed: true },
-      { id: 3, label: 'Driver Picked Up', time: '3:15 PM', completed: true },
-      { id: 4, label: 'Arriving', time: 'Est. 3:42 PM', completed: false },
-    ]
-  };
+// Mỗi bước timeline với trạng thái trigger tương ứng
+const TIMELINE_STEPS = [
+  {
+    key: 'PENDING',
+    label: 'Đặt hàng thành công',
+    description: 'Đơn hàng đã được ghi nhận',
+    icon: <ShoppingBag className="w-5 h-5" />,
+  },
+  {
+    key: 'CONFIRMED',
+    label: 'Cửa hàng xác nhận',
+    description: 'Đang chuẩn bị hàng cho bạn',
+    icon: <Package className="w-5 h-5" />,
+  },
+  {
+    key: 'SHIPPING',
+    label: 'Đang giao đến bạn',
+    description: 'Shipper đã nhận hàng và đang trên đường',
+    icon: <Truck className="w-5 h-5" />,
+  },
+  {
+    key: 'DELIVERED',
+    label: 'Giao thành công',
+    description: 'Bạn đã nhận hàng. Cảm ơn!',
+    icon: <CheckCircle2 className="w-5 h-5" />,
+  },
+];
 
-  const driver = {
-    name: 'David Chen',
-    rating: 4.9,
-    vehicle: 'Honda Civic',
-    plate: 'ABC-1234',
-    phone: '+1 (555) 123-4567',
-    avatar: 'DC'
-  };
+const STATUS_ORDER = ['PENDING', 'CONFIRMED', 'SHIPPING', 'DELIVERED'];
 
-  const orderItems = [
-    { name: 'Fish Sauce', qty: 1 },
-    { name: 'Vermicelli Noodles', qty: 2 },
-    { name: 'Grilled Pork Belly', qty: 1 },
-    { name: 'Fresh Herbs Mix', qty: 1 },
-  ];
+function getStepIndex(status: string) {
+  return STATUS_ORDER.indexOf(status);
+}
+
+function formatCurrency(amount: number) {
+  return new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' }).format(amount);
+}
+
+function formatDateTime(iso: string) {
+  try {
+    return new Date(iso).toLocaleString('vi-VN', { hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit' });
+  } catch { return ''; }
+}
+
+export function OrderTrackingPage() {
+  const { orderId } = useParams<{ orderId: string }>();
+  const navigate = useNavigate();
+  const [order, setOrder] = useState<Order | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const fetchOrder = useCallback(async () => {
+    if (!orderId) return;
+    try {
+      const res = await axios.get(`${API_URL}/orders/${orderId}`, { withCredentials: true });
+      setOrder(res.data);
+    } catch (e: any) {
+      setError(e.response?.data || 'Không tìm thấy đơn hàng');
+    } finally {
+      setLoading(false);
+    }
+  }, [orderId]);
+
+  useEffect(() => {
+    fetchOrder();
+    // Polling mỗi 15s để cập nhật trạng thái real-time
+    const interval = setInterval(fetchOrder, 15000);
+    return () => clearInterval(interval);
+  }, [fetchOrder]);
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center">
+      <div className="w-10 h-10 border-4 border-[#FF6B35] border-t-transparent rounded-full animate-spin" />
+    </div>
+  );
+
+  if (error || !order) return (
+    <div className="min-h-screen flex flex-col items-center justify-center gap-4">
+      <XCircle className="w-16 h-16 text-muted-foreground" />
+      <p className="text-muted-foreground">{error || 'Không tìm thấy đơn hàng'}</p>
+      <Button onClick={() => navigate('/')}>Về trang chủ</Button>
+    </div>
+  );
+
+  const currentStep = getStepIndex(order.status);
+  const isCancelled = order.status === 'CANCELLED';
+
+  // Status badge config
+  const statusBadge = {
+    PENDING: { label: 'Chờ xác nhận', class: 'bg-amber-500' },
+    CONFIRMED: { label: 'Đã xác nhận', class: 'bg-blue-500' },
+    SHIPPING: { label: 'Đang giao', class: 'bg-orange-500' },
+    DELIVERED: { label: 'Hoàn thành', class: 'bg-green-500' },
+    CANCELLED: { label: 'Đã huỷ', class: 'bg-red-500' },
+  }[order.status] || { label: order.status, class: 'bg-gray-500' };
 
   return (
-    <div className="min-h-screen bg-[#F9F9F9] pb-20 md:pb-8">
+    <div className="min-h-screen bg-[#F9F9F9] pb-20">
       {/* Header */}
-      <div className="sticky top-0 z-40 bg-white border-b border-gray-200 shadow-sm">
-        <div className="max-w-7xl mx-auto px-4 py-3">
-          <div className="flex items-center gap-3">
-            <button
-              onClick={() => onNavigate('home')}
-              className="p-2 hover:bg-gray-100 rounded-full"
-            >
-              <ArrowLeft className="w-6 h-6" />
-            </button>
-            <div className="flex-1">
-              <h1 className="text-xl font-bold">Order Tracking</h1>
-              <p className="text-sm text-gray-600">Order #TP-2024-0142</p>
-            </div>
-            <Badge className="bg-[#4CAF50] text-white">On the way</Badge>
+      <div className="sticky top-0 z-40 bg-white border-b shadow-sm">
+        <div className="max-w-2xl mx-auto px-4 py-4 flex items-center gap-3">
+          <button onClick={() => navigate(-1)} className="p-2 hover:bg-muted rounded-full">
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+          <div className="flex-1">
+            <h1 className="text-lg font-bold">Theo dõi đơn hàng</h1>
+            <p className="text-xs text-muted-foreground">#{order.id.slice(-8).toUpperCase()} • {order.storeName}</p>
           </div>
+          <Badge className={`${statusBadge.class} text-white`}>{statusBadge.label}</Badge>
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Main Content */}
-          <div className="lg:col-span-2 space-y-6">
-            {/* ETA Card */}
-            <Card className="bg-gradient-to-br from-[#FF6B35] to-[#ff8a5c] text-white rounded-3xl p-8 shadow-xl">
-              <div className="flex items-center gap-3 mb-4">
-                <Truck className="w-8 h-8" />
-                <div>
-                  <h2 className="text-2xl font-bold">Arriving Soon!</h2>
-                  <p className="text-white/90">Your order is on its way</p>
-                </div>
-              </div>
-              <div className="text-5xl font-bold mb-2">12 mins</div>
-              <p className="text-white/90">Estimated delivery time</p>
-            </Card>
+      <div className="max-w-2xl mx-auto px-4 py-6 space-y-5">
 
-            {/* Map Placeholder */}
-            <Card className="bg-white rounded-3xl overflow-hidden shadow-lg">
-              <div className="relative aspect-video bg-gradient-to-br from-green-100 to-blue-100 flex items-center justify-center">
-                <div className="text-center">
-                  <MapPin className="w-16 h-16 text-[#FF6B35] mx-auto mb-4" />
-                  <p className="text-gray-600 font-medium">Interactive Map</p>
-                  <p className="text-sm text-gray-500">Live tracking coming soon</p>
-                </div>
-                {/* Simulated route */}
-                <div className="absolute inset-0 pointer-events-none">
-                  <svg className="w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
-                    <path
-                      d="M 10 80 Q 30 40, 50 50 T 90 20"
-                      stroke="#FF6B35"
-                      strokeWidth="0.5"
-                      fill="none"
-                      strokeDasharray="2,2"
-                    />
-                  </svg>
-                </div>
+        {/* Cancelled banner */}
+        {isCancelled && (
+          <Card className="p-5 border-red-200 bg-red-50">
+            <div className="flex items-center gap-3 text-red-600">
+              <XCircle className="w-6 h-6" />
+              <div>
+                <p className="font-semibold">Đơn hàng đã bị huỷ</p>
+                <p className="text-sm text-red-500">Liên hệ hỗ trợ nếu bạn cần giúp đỡ.</p>
               </div>
-              <div className="p-4 flex items-center justify-between bg-gray-50">
-                <div className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4 text-gray-600" />
-                  <span className="text-sm font-medium">123 Main Street, Apt 4B</span>
-                </div>
-                <Button size="sm" variant="ghost" className="text-[#FF6B35]">
-                  Edit
-                </Button>
-              </div>
-            </Card>
+            </div>
+          </Card>
+        )}
 
-            {/* Order Timeline */}
-            <Card className="bg-white rounded-3xl p-6 shadow-lg">
-              <h3 className="text-xl font-bold mb-6">Order Status</h3>
-              <div className="space-y-6">
-                {orderStatus.steps.map((step, index) => (
-                  <div key={step.id} className="flex gap-4">
+        {/* Shopee-style Timeline */}
+        {!isCancelled && (
+          <Card className="p-6">
+            <h3 className="font-bold text-lg mb-6">Trạng thái đơn hàng</h3>
+            <div className="space-y-0">
+              {TIMELINE_STEPS.map((step, idx) => {
+                const done = currentStep >= idx;
+                const active = currentStep === idx;
+                const isLast = idx === TIMELINE_STEPS.length - 1;
+
+                return (
+                  <div key={step.key} className="flex gap-4">
+                    {/* Line + Circle */}
                     <div className="flex flex-col items-center">
-                      <div
-                        className={`w-10 h-10 rounded-full flex items-center justify-center ${
-                          step.completed
-                            ? 'bg-[#4CAF50] text-white'
-                            : 'bg-gray-200 text-gray-500'
-                        }`}
-                      >
-                        {step.completed ? (
-                          <CheckCircle2 className="w-6 h-6" />
-                        ) : (
-                          <div className="w-3 h-3 bg-gray-400 rounded-full" />
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 transition-all ${done
+                        ? active
+                          ? 'bg-[#FF6B35] text-white shadow-lg shadow-orange-200 scale-110'
+                          : 'bg-green-500 text-white'
+                        : 'bg-gray-100 text-gray-400'
+                        }`}>
+                        {done && !active ? <CheckCircle2 className="w-5 h-5" /> : step.icon}
+                      </div>
+                      {!isLast && (
+                        <div className={`w-0.5 h-12 ${done ? 'bg-green-400' : 'bg-gray-200'}`} />
+                      )}
+                    </div>
+
+                    {/* Content */}
+                    <div className="flex-1 pb-10">
+                      <div className="flex items-center justify-between">
+                        <h4 className={`font-semibold ${done ? 'text-foreground' : 'text-muted-foreground'}`}>
+                          {step.label}
+                          {active && (
+                            <span className="ml-2 inline-flex items-center gap-1 text-[10px] bg-[#FF6B35]/10 text-[#FF6B35] px-2 py-0.5 rounded-full font-medium">
+                              <span className="w-1.5 h-1.5 bg-[#FF6B35] rounded-full animate-pulse" />
+                              Đang xử lý
+                            </span>
+                          )}
+                        </h4>
+                        {done && (
+                          <span className="text-xs text-muted-foreground">
+                            {active ? formatDateTime(order.updatedAt) : ''}
+                          </span>
                         )}
                       </div>
-                      {index < orderStatus.steps.length - 1 && (
-                        <div
-                          className={`w-0.5 h-12 ${
-                            step.completed ? 'bg-[#4CAF50]' : 'bg-gray-200'
-                          }`}
-                        />
-                      )}
-                    </div>
-                    <div className="flex-1 pb-6">
-                      <div className="flex items-center justify-between mb-1">
-                        <h4
-                          className={`font-semibold ${
-                            step.completed ? 'text-gray-900' : 'text-gray-500'
-                          }`}
-                        >
-                          {step.label}
-                        </h4>
-                        <span className="text-sm text-gray-500">{step.time}</span>
-                      </div>
-                      {step.id === 1 && (
-                        <p className="text-sm text-gray-600">
-                          Your order has been confirmed and is being processed
-                        </p>
-                      )}
-                      {step.id === 2 && (
-                        <p className="text-sm text-gray-600">
-                          Restaurant is preparing your ingredients
-                        </p>
-                      )}
-                      {step.id === 3 && (
-                        <p className="text-sm text-gray-600">
-                          {driver.name} has picked up your order
-                        </p>
-                      )}
-                      {step.id === 4 && (
-                        <p className="text-sm text-gray-600">
-                          Your order will arrive shortly
-                        </p>
-                      )}
+                      <p className={`text-sm mt-0.5 ${done ? 'text-muted-foreground' : 'text-muted-foreground/50'}`}>
+                        {step.description}
+                      </p>
                     </div>
                   </div>
-                ))}
-              </div>
-            </Card>
+                );
+              })}
+            </div>
+          </Card>
+        )}
 
-            {/* Order Items */}
-            <Card className="bg-white rounded-3xl p-6 shadow-lg">
-              <h3 className="text-xl font-bold mb-4">Order Items</h3>
-              <div className="space-y-3">
-                {orderItems.map((item, idx) => (
-                  <div key={idx} className="flex items-center justify-between py-2">
-                    <div className="flex items-center gap-3">
-                      <Package className="w-5 h-5 text-gray-400" />
-                      <span className="font-medium">{item.name}</span>
-                    </div>
-                    <span className="text-gray-600">x{item.qty}</span>
-                  </div>
-                ))}
+        {/* Order Items */}
+        <Card className="p-5">
+          <h3 className="font-bold mb-4">Sản phẩm đã đặt</h3>
+          <div className="space-y-2">
+            {order.items.map((item, i) => (
+              <div key={i} className="flex justify-between text-sm py-1.5 border-b border-muted last:border-0">
+                <span className="flex items-center gap-2">
+                  <Package className="w-4 h-4 text-muted-foreground" /> {item.name}
+                </span>
+                <span className="text-muted-foreground">x{item.qty} • {formatCurrency(item.price * item.qty)}</span>
               </div>
-            </Card>
+            ))}
           </div>
+          {order.note && (
+            <p className="text-xs text-amber-600 bg-amber-50 rounded-lg p-2 mt-3">📝 {order.note}</p>
+          )}
+        </Card>
 
-          {/* Sidebar */}
-          <div className="lg:col-span-1 space-y-6">
-            {/* Driver Card */}
-            <Card className="bg-white rounded-3xl p-6 shadow-lg sticky top-20">
-              <h3 className="text-lg font-bold mb-4">Your Driver</h3>
-              
-              <div className="flex items-center gap-4 mb-6">
-                <Avatar className="w-16 h-16">
-                  <div className="bg-[#FF6B35] text-white flex items-center justify-center h-full w-full text-xl font-bold">
-                    {driver.avatar}
-                  </div>
-                </Avatar>
-                <div className="flex-1">
-                  <h4 className="font-semibold text-lg">{driver.name}</h4>
-                  <div className="flex items-center gap-1 text-sm text-gray-600">
-                    <span className="text-[#FFB800]">★</span>
-                    <span className="font-medium">{driver.rating}</span>
-                    <span className="text-gray-400">• 250+ deliveries</span>
-                  </div>
-                </div>
-              </div>
-
-              <div className="space-y-3 mb-6">
-                <div className="flex items-center gap-3 text-sm">
-                  <Truck className="w-4 h-4 text-gray-500" />
-                  <span className="text-gray-600">{driver.vehicle}</span>
-                </div>
-                <div className="flex items-center gap-3 text-sm">
-                  <span className="text-gray-600 font-mono">{driver.plate}</span>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <Button
-                  variant="outline"
-                  className="h-12 rounded-full flex items-center justify-center gap-2"
-                >
-                  <Phone className="w-5 h-5" />
-                  Call
-                </Button>
-                <Button
-                  variant="outline"
-                  className="h-12 rounded-full flex items-center justify-center gap-2"
-                >
-                  <MessageCircle className="w-5 h-5" />
-                  Chat
-                </Button>
-              </div>
-            </Card>
-
-            {/* Help Card */}
-            <Card className="bg-gradient-to-br from-purple-50 to-blue-50 rounded-3xl p-6 border-2 border-purple-100">
-              <h3 className="font-semibold mb-2">Need Help?</h3>
-              <p className="text-sm text-gray-600 mb-4">
-                Contact our support team if you have any questions
-              </p>
-              <Button
-                variant="outline"
-                className="w-full rounded-full border-purple-200 hover:bg-purple-100"
-              >
-                Contact Support
-              </Button>
-            </Card>
-
-            {/* Order Summary */}
-            <Card className="bg-white rounded-3xl p-6 shadow-lg">
-              <h3 className="font-semibold mb-4">Payment Summary</h3>
-              <div className="space-y-2 text-sm mb-4">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Subtotal</span>
-                  <span className="font-medium">$18.00</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Delivery</span>
-                  <span className="font-medium text-[#4CAF50]">FREE</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Tax</span>
-                  <span className="font-medium">$1.44</span>
-                </div>
-              </div>
-              <div className="pt-3 border-t border-gray-200 flex justify-between items-center">
-                <span className="font-bold">Total</span>
-                <span className="text-xl font-bold text-[#FF6B35]">$19.44</span>
-              </div>
-            </Card>
+        {/* Payment Summary */}
+        <Card className="p-5">
+          <h3 className="font-bold mb-4">Tóm tắt thanh toán</h3>
+          <div className="space-y-2 text-sm">
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Tạm tính</span>
+              <span>{formatCurrency(order.totalAmount)}</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-muted-foreground">Phí giao hàng</span>
+              <span className="text-green-600 font-medium">MIỄN PHÍ</span>
+            </div>
+            <div className="flex justify-between pt-3 border-t font-bold text-base">
+              <span>Tổng cộng</span>
+              <span className="text-[#FF6B35]">{formatCurrency(order.totalAmount)}</span>
+            </div>
           </div>
-        </div>
+          <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+            <Clock className="w-4 h-4" />
+            <span>Đặt lúc: {formatDateTime(order.createdAt)}</span>
+          </div>
+        </Card>
+
+        {/* Cancel button (chỉ khi PENDING) */}
+        {order.status === 'PENDING' && (
+          <Button
+            variant="outline"
+            className="w-full rounded-xl border-red-200 text-red-500 hover:bg-red-50"
+            onClick={async () => {
+              try {
+                await axios.put(`${API_URL}/orders/${order.id}/cancel`, {}, { withCredentials: true });
+                fetchOrder();
+              } catch (e: any) {
+                alert(e.response?.data?.error || 'Không thể huỷ đơn');
+              }
+            }}
+          >
+            Huỷ đơn hàng
+          </Button>
+        )}
       </div>
     </div>
   );

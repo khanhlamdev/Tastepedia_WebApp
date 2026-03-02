@@ -8,19 +8,18 @@ import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
 import { Avatar } from '../ui/avatar';
+import { useNotifications } from '../../hooks/useNotifications';
 
-interface HeaderProps {
-  onNavigate?: (page: string, recipeId?: string, query?: string) => void;
-}
-
-export function Header({ onNavigate }: HeaderProps) {
+export function Header() {
   const navigate = useNavigate();
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
+  // --- Notification bell badge ---
+  const { unreadCount } = useNotifications();
+
   useEffect(() => {
-    // Check if user is logged in (from localStorage or auth service)
     const checkLoginStatus = () => {
       const user = localStorage.getItem('user');
       setIsLoggedIn(!!user);
@@ -99,15 +98,20 @@ export function Header({ onNavigate }: HeaderProps) {
                     3
                   </Badge>
                 </button>
+
+                {/* Bell Icon — Live Unread Badge */}
                 <button
                   onClick={() => navigate('/notifications')}
                   className="relative p-2 hover:bg-muted rounded-full transition-colors hidden md:block"
                 >
                   <Bell className="w-6 h-6 text-foreground" />
-                  <Badge className="absolute -top-1 -right-1 h-5 w-5 flex items-center justify-center p-0 bg-[#FF6B35] text-white text-xs border-2 border-background">
-                    2
-                  </Badge>
+                  {unreadCount > 0 && (
+                    <Badge className="absolute -top-1 -right-1 h-5 min-w-5 flex items-center justify-center p-0 bg-[#FF6B35] text-white text-xs border-2 border-background px-1">
+                      {unreadCount > 99 ? '99+' : unreadCount}
+                    </Badge>
+                  )}
                 </button>
+
                 <button onClick={() => navigate('/profile')} className="hidden md:block">
                   <Avatar className="h-9 w-9 border-2 border-border hover:border-[#FF6B35] transition-colors">
                     <div className="bg-[#FF6B35] text-white flex items-center justify-center h-full w-full">

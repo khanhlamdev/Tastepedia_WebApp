@@ -29,9 +29,10 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/api/auth/**", "/api/recipes/**", "/api/favorites/**").permitAll()
                         .requestMatchers("/api/community/**", "/api/reviews/**", "/api/users/**", "/api/ai/**").permitAll()
-                        // Admin routes: permitAll ở đây để pass qua Spring Security,
-                        // logic kiểm tra quyền ADMIN được xử lý bên trong AdminController qua session
+                        .requestMatchers("/api/notifications/**").permitAll()
+                        .requestMatchers("/api/orders/**", "/api/stores/**", "/api/store-products/**").permitAll()
                         .requestMatchers("/api/admin/**").permitAll()
+                        .requestMatchers("/ws/**").permitAll()
                         .anyRequest().authenticated()
                 );
 
@@ -41,8 +42,8 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        // Cho phép tất cả các origin (để dev cho dễ), hoặc list cụ thể
-        configuration.setAllowedOriginPatterns(List.of("*")); 
+        // Cho phép frontend cụ thể thay vì wildcard khi dùng credentials
+        configuration.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:5173", "http://127.0.0.1:3000")); 
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setAllowCredentials(true);

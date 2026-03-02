@@ -4,6 +4,7 @@ import {
   CheckCircle2, ChefHat, Bike,
   ChevronLeft, ChevronRight, Tag, Globe, Video
 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Checkbox } from './ui/checkbox';
@@ -64,11 +65,6 @@ interface ReviewData {
 }
 
 import { useParams, useNavigate } from 'react-router-dom';
-
-interface RecipeDetailPageProps {
-  onNavigate?: (page: string) => void; // Keep for compatibility if needed, but we'll use useNavigate
-  recipeId?: string | null;
-}
 
 export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeDetailPageProps) {
   const navigate = useNavigate();
@@ -231,6 +227,41 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
   const scrollToReviews = () => reviewsRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   const handleOrderReadyMeal = () => setShowRestaurantModal(true);
 
+  const handleAddToCart = () => {
+    if (selectedIngredients.length === 0) {
+      toast.error('Vui lòng chọn ít nhất 1 nguyên liệu để thêm vào giỏ hàng!');
+      return;
+    }
+    const cartItemsToAdd = displayIngredients
+      .filter(i => selectedIngredients.includes(i.id))
+      .map(i => ({
+        id: i.name, // Dùng tên nguyên liệu làm key để CartPage tìm store
+        name: i.name,
+        image: recipe?.mainImageUrl || "https://images.unsplash.com/photo-1763703544688-2ac7839b0659",
+        price: 0, // Giá sẽ được fetch lại bên CartPage tuỳ cửa hàng
+        quantity: 1,
+        recipe: recipe?.title || 'Unknown Recipe'
+      }));
+
+    try {
+      const existingCart = JSON.parse(localStorage.getItem('tastepedia_cart') || '[]');
+      // Gộp item trùng
+      cartItemsToAdd.forEach(newItem => {
+        const existing = existingCart.find((item: any) => item.name === newItem.name);
+        if (existing) {
+          existing.quantity += 1;
+        } else {
+          existingCart.push(newItem);
+        }
+      });
+      localStorage.setItem('tastepedia_cart', JSON.stringify(existingCart));
+      toast.success('Đã thêm nguyên liệu vào giỏ hàng của bạn!');
+    } catch (e) {
+      console.error('Error saving to cart', e);
+      toast.error('Lỗi khi thêm vào giỏ hàng');
+    }
+  };
+
   const averageRating = 4.8;
   const totalReviews = reviews.length;
 
@@ -314,7 +345,7 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
 
               {displayMedia.length > 1 && (
                 <div className="absolute bottom-4 left-1/2 -translate-x-1/2 flex gap-2 z-10">
-                  {displayMedia.map((media, idx) => (
+                  {displayMedia.map((_, idx) => (
                     <button key={idx} onClick={() => setCurrentImageIndex(idx)} className={`h-2 rounded-full transition-all duration-300 shadow-sm ${idx === currentImageIndex ? 'bg-white w-6' : 'bg-white/50 w-2 hover:bg-white/80'}`} />
                   ))}
                 </div>
@@ -522,7 +553,7 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
                 </div>
                 <Separator className="my-4" />
                 <div className="flex justify-between items-center mb-4"><span className="font-semibold">Total:</span><span className="text-2xl font-bold text-[#FF6B35]">{totalPrice.toLocaleString('vi-VN')} đ</span></div>
-                <Button className="w-full h-12 bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-full mb-3"><ShoppingCart className="w-5 h-5 mr-2" />Add to Cart & Delivery</Button>
+                <Button onClick={handleAddToCart} className="w-full h-12 bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-full mb-3"><ShoppingCart className="w-5 h-5 mr-2" />Add to Cart & Delivery</Button>
                 <div className="flex items-center justify-center gap-2 text-sm text-gray-500"><CheckCircle2 className="w-4 h-4 text-[#4CAF50]" />Delivery in 30-45 mins</div>
               </div>
             </div>

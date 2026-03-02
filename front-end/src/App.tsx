@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Routes, Route, useNavigate, Navigate, useLocation } from 'react-router-dom';
+import { Routes, Route, useNavigate, useLocation } from 'react-router-dom';
 import axios from 'axios';
 import { AuthPage } from './components/AuthPage';
 import { OnboardingPage } from './components/OnboardingPage';
@@ -36,6 +36,9 @@ import { AdminDashboard } from './components/admin/AdminDashboard';
 import { AdminUsers } from './components/admin/AdminUsers';
 import { AdminModeration } from './components/admin/AdminModeration';
 import { AdminRecipes } from './components/admin/AdminRecipes';
+import { StoreDashboardPage } from './components/StoreDashboardPage';
+import { RegisterStorePage } from './components/RegisterStorePage';
+import { Toaster } from 'sonner';
 
 export default function App() {
   const navigate = useNavigate();
@@ -104,12 +107,14 @@ export default function App() {
       case 'edit-recipe': navigate(`/edit-recipe/${recipeId || ''}`); break;
       case 'edit-profile': navigate('/edit-profile'); break;
       case 'admin': navigate('/admin'); break;
+      case 'register-store': navigate('/register-store'); break;
+      case 'store-dashboard': navigate('/store-dashboard'); break;
       default: navigate('*'); // 404
     }
     window.scrollTo(0, 0);
   };
 
-  const showMobileNav = !['/auth', '/login', '/signup', '/onboarding'].includes(location.pathname);
+  const showMobileNav = !['/auth', '/login', '/signup', '/onboarding', '/store-dashboard'].includes(location.pathname);
 
   if (isLoadingSession) {
     return (
@@ -141,12 +146,23 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-background">
+      {/* Sonner Toast Container — thông báo real-time */}
+      <Toaster
+        position="top-right"
+        richColors
+        expand
+        duration={5000}
+        toastOptions={{
+          style: { fontFamily: 'inherit' },
+        }}
+      />
       <Routes>
         {/* Public Routes */}
         <Route path="/" element={<HomePage onNavigate={handleNavigate} />} />
         <Route path="/auth" element={<AuthPage onComplete={() => navigate('/')} onNavigate={handleNavigate} />} />
         <Route path="/login" element={<AuthPage initialView="login" onComplete={() => navigate('/')} onNavigate={handleNavigate} />} />
         <Route path="/signup" element={<AuthPage initialView="signup" onComplete={() => navigate('/')} onNavigate={handleNavigate} />} />
+        <Route path="/register-store" element={<RegisterStorePage />} />
         <Route path="/onboarding" element={<OnboardingPage onComplete={() => navigate('/')} />} />
 
         <Route path="/search" element={<SearchPage onNavigate={handleNavigate} initialQuery={currentSearchQuery} />} />
@@ -161,10 +177,13 @@ export default function App() {
         {/* Protected Routes */}
         <Route element={<ProtectedRoute />}>
           <Route path="/meal-planner" element={<MealPlanningPage />} />
-          <Route path="/cart" element={<CartPage onNavigate={handleNavigate} />} />
+          <Route path="/cart" element={<CartPage />} />
           <Route path="/checkout/shipping" element={<CheckoutShippingPage onNavigate={handleNavigate} />} />
           <Route path="/checkout/payment" element={<CheckoutPaymentPage onNavigate={handleNavigate} />} />
-          <Route path="/tracking" element={<OrderTrackingPage onNavigate={handleNavigate} />} />
+          {/* Tracking: supports both static /tracking and /tracking/:orderId */}
+          <Route path="/tracking" element={<OrderTrackingPage />} />
+          <Route path="/tracking/:orderId" element={<OrderTrackingPage />} />
+          <Route path="/store-dashboard" element={<StoreDashboardPage />} />
           <Route path="/food-tracking" element={<FoodOrderTrackingPage onNavigate={handleNavigate} />} />
           <Route path="/profile" element={<ProfilePage onNavigate={handleNavigate} />} />
           <Route path="/wallet" element={<TasteWalletPage onNavigate={handleNavigate} />} />

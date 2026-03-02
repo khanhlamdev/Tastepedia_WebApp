@@ -1,4 +1,7 @@
 import { useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import axios from 'axios';
+import { toast } from 'sonner';
 import { ArrowLeft, CreditCard, Wallet, Banknote, Gift, Lock } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -13,18 +16,56 @@ interface CheckoutPaymentPageProps {
 }
 
 export function CheckoutPaymentPage({ onNavigate }: CheckoutPaymentPageProps) {
-  const [paymentMethod, setPaymentMethod] = useState('card');
+  const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [paymentMethod, setPaymentMethod] = useState('COD');
   const [useTastePoints, setUseTastePoints] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
 
   const tastePointsBalance = 5.20;
 
-  const handlePlaceOrder = () => {
+  // Lấy storeId từ query param (VD: /checkout-payment?storeId=xxx)
+  const storeId = searchParams.get('storeId') || '';
+
+  const handlePlaceOrder = async () => {
+    if (!storeId) {
+      toast.error('Vui lòng chọn cửa hàng trước khi thanh toán');
+      return;
+    }
     setIsProcessing(true);
-    setTimeout(() => {
+    try {
+      // Lấy cart từ localStorage
+      const cartRaw = localStorage.getItem('tastepedia_cart');
+      const cart = cartRaw ? JSON.parse(cartRaw) : [];
+
+      // Lấy địa chỉ giao hàng từ localStorage (set tại CheckoutShippingPage)
+      const address = localStorage.getItem('tastepedia_delivery_address') || 'Địa chỉ chưa cập nhật';
+      const phone = localStorage.getItem('tastepedia_delivery_phone') || '';
+
+      const totalAmount = cart.reduce((sum: number, item: any) => sum + item.price * item.qty, 0);
+
+      const payload = {
+        storeId,
+        items: cart.map((item: any) => ({ name: item.name, qty: item.qty, price: item.price, imageUrl: item.imageUrl })),
+        userAddress: address,
+        userPhone: phone,
+        paymentMethod: paymentMethod.toUpperCase(),
+        totalAmount,
+      };
+
+      const res = await axios.post('http://localhost:8080/api/orders', payload, { withCredentials: true });
+      const order = res.data;
+
+      // Xoá cart sau khi đặt thành công
+      localStorage.removeItem('tastepedia_cart');
+
+      toast.success('Đặt hàng thành công! 🎉');
+      navigate(`/tracking/${order.id}`);
+    } catch (e: any) {
+      toast.error(e.response?.data?.error || 'Đặt hàng thất bại, vui lòng thử lại');
+    } finally {
       setIsProcessing(false);
-      onNavigate('tracking');
-    }, 2000);
+    }
   };
 
   return (
@@ -57,16 +98,15 @@ export function CheckoutPaymentPage({ onNavigate }: CheckoutPaymentPageProps) {
         {/* Payment Method Selection */}
         <Card className="p-6">
           <h3 className="font-semibold mb-4">Select Payment Method</h3>
-          
+
           <RadioGroup value={paymentMethod} onValueChange={setPaymentMethod}>
             <div className="space-y-3">
               {/* Credit/Debit Card */}
               <label
-                className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${
-                  paymentMethod === 'card'
+                className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'card'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
-                }`}
+                  }`}
               >
                 <RadioGroupItem value="card" className="mt-0.5" />
                 <div className="flex-1">
@@ -82,11 +122,10 @@ export function CheckoutPaymentPage({ onNavigate }: CheckoutPaymentPageProps) {
 
               {/* E-Wallet */}
               <label
-                className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${
-                  paymentMethod === 'wallet'
+                className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'wallet'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
-                }`}
+                  }`}
               >
                 <RadioGroupItem value="wallet" className="mt-0.5" />
                 <div className="flex-1">
@@ -102,11 +141,10 @@ export function CheckoutPaymentPage({ onNavigate }: CheckoutPaymentPageProps) {
 
               {/* Cash on Delivery */}
               <label
-                className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${
-                  paymentMethod === 'cod'
+                className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'cod'
                     ? 'border-primary bg-primary/5'
                     : 'border-border hover:border-primary/50'
-                }`}
+                  }`}
               >
                 <RadioGroupItem value="cod" className="mt-0.5" />
                 <div className="flex-1">

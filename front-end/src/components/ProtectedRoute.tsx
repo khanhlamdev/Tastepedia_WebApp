@@ -9,8 +9,8 @@ export function ProtectedRoute() {
 
     const user = JSON.parse(userStr);
 
-    // Force Onboarding if not completed
-    if (!user.hasCompletedOnboarding) {
+    // Force Onboarding if not completed (except for STORE accounts)
+    if (!user.hasCompletedOnboarding && user.role !== 'STORE') {
         return <Navigate to="/onboarding" replace />;
     }
 

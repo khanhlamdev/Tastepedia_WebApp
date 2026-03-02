@@ -3,6 +3,7 @@ package com.tastepedia.backend.controller;
 import com.tastepedia.backend.model.CommunityPost;
 import com.tastepedia.backend.model.User; // Import model User
 import com.tastepedia.backend.repository.CommunityPostRepository;
+import com.tastepedia.backend.service.NotificationService;
 import jakarta.servlet.http.HttpSession; // Import Session
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -31,6 +32,9 @@ public class CommunityController {
 
     @Autowired
     private CloudinaryService cloudinaryService;
+
+    @Autowired
+    private NotificationService notificationService;
 
     @PostMapping("/upload")
     public ResponseEntity<?> uploadImage(
@@ -226,6 +230,18 @@ public class CommunityController {
             } else {
                 post.setLikes(post.getLikes() + 1);
                 post.getLikedUserIds().add(userId);
+
+                // --- NOTIFICATION: Chỉ gửi khi KHÔNG phải chính chủ like bài của mình ---
+                if (!userId.equals(post.getUserId())) {
+                    notificationService.createAndSend(
+                        post.getUserId(),
+                        "LIKE_POST",
+                        currentUser.getFullName(),
+                        currentUser.getProfileImageUrl() != null ? currentUser.getProfileImageUrl() : "",
+                        currentUser.getFullName() + " đã thích bài viết của bạn.",
+                        "/community"
+                    );
+                }
             }
 
             return ResponseEntity.ok(postRepository.save(post));
@@ -253,6 +269,18 @@ public class CommunityController {
             } else {
                 comment.setLikes(comment.getLikes() + 1);
                 comment.getLikedUserIds().add(userId);
+
+                // --- NOTIFICATION: Chỉ gửi khi KHÔNG phải chính chủ like comment của mình ---
+                if (!userId.equals(comment.getUserId())) {
+                    notificationService.createAndSend(
+                        comment.getUserId(),
+                        "LIKE_COMMENT",
+                        currentUser.getFullName(),
+                        currentUser.getProfileImageUrl() != null ? currentUser.getProfileImageUrl() : "",
+                        currentUser.getFullName() + " đã thích bình luận của bạn.",
+                        "/community"
+                    );
+                }
             }
 
             return ResponseEntity.ok(commentRepository.save(comment));
@@ -436,6 +464,18 @@ public class CommunityController {
                 // Cập nhật số comment trong Post chính
                 updatePostCommentCount(postId, 1);
 
+                // --- NOTIFICATION: Notify chủ comment cha nếu KHÔNG phải chính mình reply ---
+                if (!currentUser.getId().equals(parent.getUserId())) {
+                    notificationService.createAndSend(
+                        parent.getUserId(),
+                        "REPLY_COMMENT",
+                        currentUser.getFullName(),
+                        currentUser.getProfileImageUrl() != null ? currentUser.getProfileImageUrl() : "",
+                        currentUser.getFullName() + " đã trả lời bình luận của bạn.",
+                        "/community"
+                    );
+                }
+
                 return ResponseEntity.ok(parent);
             }
         } else {
@@ -452,6 +492,22 @@ public class CommunityController {
 
             Comment saved = commentRepository.save(comment);
             updatePostCommentCount(postId, 1);
+
+            // --- NOTIFICATION: Notify chủ bài viết nếu KHÔNG phải chính mình comment ---
+            Optional<CommunityPost> postOpt2 = postRepository.findById(postId);
+            postOpt2.ifPresent(targetPost -> {
+                if (!currentUser.getId().equals(targetPost.getUserId())) {
+                    notificationService.createAndSend(
+                        targetPost.getUserId(),
+                        "COMMENT_POST",
+                        currentUser.getFullName(),
+                        currentUser.getProfileImageUrl() != null ? currentUser.getProfileImageUrl() : "",
+                        currentUser.getFullName() + " đã bình luận vào bài viết của bạn.",
+                        "/community"
+                    );
+                }
+            });
+
             return ResponseEntity.ok(saved);
         }
         return ResponseEntity.badRequest().build();

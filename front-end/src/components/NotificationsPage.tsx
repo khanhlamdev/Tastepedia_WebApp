@@ -1,121 +1,143 @@
-import { ArrowLeft, Package, Gift, Users, Bell, Settings as SettingsIcon } from 'lucide-react';
+import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  ArrowLeft, Package, Gift, Users, Bell, Settings as SettingsIcon,
+  Heart, MessageCircle, CornerDownRight, ShoppingBag, Star, AlertCircle, CheckCheck, Trash2
+} from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
+import { useNotifications, Notification } from '../hooks/useNotifications';
 
 interface NotificationsPageProps {
   onNavigate: (page: string) => void;
 }
 
+// Chọn icon theo loại thông báo
+function getIcon(type: string) {
+  switch (type) {
+    case 'LIKE_POST':
+    case 'LIKE_COMMENT': return <Heart className="w-5 h-5 text-rose-500" />;
+    case 'COMMENT_POST': return <MessageCircle className="w-5 h-5 text-blue-500" />;
+    case 'REPLY_COMMENT': return <CornerDownRight className="w-5 h-5 text-purple-500" />;
+    case 'ORDER': return <Package className="w-5 h-5 text-orange-500" />;
+    case 'PROMO': return <Gift className="w-5 h-5 text-green-500" />;
+    case 'FOLLOW': return <Users className="w-5 h-5 text-indigo-500" />;
+    case 'REWARD': return <Star className="w-5 h-5 text-yellow-500" />;
+    case 'SYSTEM': return <AlertCircle className="w-5 h-5 text-gray-500" />;
+    default: return <Bell className="w-5 h-5 text-gray-400" />;
+  }
+}
+
+// Chọn màu nền avatar theo loại thông báo
+function getIconBg(type: string) {
+  switch (type) {
+    case 'LIKE_POST':
+    case 'LIKE_COMMENT': return 'bg-rose-100';
+    case 'COMMENT_POST': return 'bg-blue-100';
+    case 'REPLY_COMMENT': return 'bg-purple-100';
+    case 'ORDER': return 'bg-orange-100';
+    case 'PROMO': return 'bg-green-100';
+    case 'FOLLOW': return 'bg-indigo-100';
+    case 'REWARD': return 'bg-yellow-100';
+    default: return 'bg-gray-100';
+  }
+}
+
+// Phân loại thông báo theo tab
+function getCategory(type: string): string {
+  if (['LIKE_POST', 'LIKE_COMMENT', 'COMMENT_POST', 'REPLY_COMMENT', 'FOLLOW'].includes(type)) return 'social';
+  if (['ORDER'].includes(type)) return 'orders';
+  if (['PROMO', 'REWARD'].includes(type)) return 'promos';
+  return 'system';
+}
+
+// Format thời gian tương đối
+function formatTime(isoString: string): string {
+  try {
+    const date = new Date(isoString);
+    const now = new Date();
+    const diff = Math.floor((now.getTime() - date.getTime()) / 1000);
+    if (diff < 60) return `${diff} giây trước`;
+    if (diff < 3600) return `${Math.floor(diff / 60)} phút trước`;
+    if (diff < 86400) return `${Math.floor(diff / 3600)} giờ trước`;
+    return `${Math.floor(diff / 86400)} ngày trước`;
+  } catch {
+    return '';
+  }
+}
+
 export function NotificationsPage({ onNavigate }: NotificationsPageProps) {
-  const notifications = {
-    orders: [
-      {
-        id: 1,
-        title: 'Order Delivered Successfully',
-        message: 'Your order #TP-2024-0142 has been delivered',
-        time: '10 minutes ago',
-        read: false,
-        icon: Package,
-        color: 'text-secondary'
-      },
-      {
-        id: 2,
-        title: 'Driver Assigned',
-        message: 'David Chen is on the way with your order',
-        time: '25 minutes ago',
-        read: false,
-        icon: Package,
-        color: 'text-primary'
-      },
-      {
-        id: 3,
-        title: 'Order Confirmed',
-        message: 'Your order #TP-2024-0142 is being prepared',
-        time: '1 hour ago',
-        read: true,
-        icon: Package,
-        color: 'text-muted-foreground'
-      },
-    ],
-    promos: [
-      {
-        id: 4,
-        title: '🎉 Flash Sale: 50% Off!',
-        message: 'Get 50% off on all premium recipes today only',
-        time: '2 hours ago',
-        read: false,
-        icon: Gift,
-        color: 'text-primary'
-      },
-      {
-        id: 5,
-        title: 'Weekend Special Offer',
-        message: 'Free delivery on orders above $20 this weekend',
-        time: '1 day ago',
-        read: true,
-        icon: Gift,
-        color: 'text-muted-foreground'
-      },
-    ],
-    social: [
-      {
-        id: 6,
-        title: 'Chef Minh started following you',
-        message: 'Chef Minh is now following your cooking journey',
-        time: '3 hours ago',
-        read: false,
-        icon: Users,
-        color: 'text-primary'
-      },
-      {
-        id: 7,
-        title: 'New comment on your recipe',
-        message: 'Sarah commented: "This looks amazing! Can\'t wait to try it"',
-        time: '5 hours ago',
-        read: false,
-        icon: Users,
-        color: 'text-primary'
-      },
-    ],
+  const navigate = useNavigate();
+  const { notifications, unreadCount, markRead, markAllRead, clearAll } = useNotifications();
+  const [activeTab, setActiveTab] = useState('all');
+
+  const filterByTab = (tab: string): Notification[] => {
+    if (tab === 'all') return notifications;
+    return notifications.filter((n) => getCategory(n.type) === tab);
   };
 
-  const unreadCount = [...notifications.orders, ...notifications.promos, ...notifications.social]
-    .filter(n => !n.read).length;
+  const handleClickNotification = (notification: Notification) => {
+    if (!notification.read) {
+      markRead(notification.id);
+    }
+    if (notification.link) {
+      navigate(notification.link);
+    }
+  };
 
-  const NotificationItem = ({ notification }: { notification: any }) => {
-    const Icon = notification.icon;
-    
-    return (
-      <button
-        className={`w-full p-4 rounded-xl flex items-start gap-3 hover:bg-muted/50 transition-colors ${
-          !notification.read ? 'bg-primary/5' : ''
+  const handleClearAll = async () => {
+    await clearAll();
+  };
+
+  const handleMarkAllRead = async () => {
+    await markAllRead();
+  };
+
+  // --- Notification Item Component ---
+  const NotificationItem = ({ notification }: { notification: Notification }) => (
+    <button
+      onClick={() => handleClickNotification(notification)}
+      className={`w-full p-4 rounded-xl flex items-start gap-3 hover:bg-muted/50 transition-colors text-left ${!notification.read ? 'bg-[#FF6B35]/5 border border-[#FF6B35]/10' : ''
         }`}
-      >
-        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
-          !notification.read ? 'bg-primary/10' : 'bg-muted'
-        }`}>
-          <Icon className={`w-5 h-5 ${notification.color}`} />
-        </div>
+    >
+      {/* Icon */}
+      <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${getIconBg(notification.type)}`}>
+        {getIcon(notification.type)}
+      </div>
 
-        <div className="flex-1 text-left min-w-0">
-          <div className="flex items-start justify-between gap-2 mb-1">
-            <h4 className={`font-semibold text-sm ${!notification.read ? 'text-foreground' : 'text-muted-foreground'}`}>
-              {notification.title}
-            </h4>
-            {!notification.read && (
-              <div className="w-2 h-2 bg-primary rounded-full flex-shrink-0 mt-1.5"></div>
-            )}
-          </div>
-          <p className="text-sm text-muted-foreground line-clamp-2 mb-1">
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <p className={`text-sm leading-snug ${!notification.read ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>
             {notification.message}
           </p>
-          <span className="text-xs text-muted-foreground">{notification.time}</span>
+          {!notification.read && (
+            <div className="w-2 h-2 bg-[#FF6B35] rounded-full flex-shrink-0 mt-1.5" />
+          )}
         </div>
-      </button>
-    );
+        <span className="text-xs text-muted-foreground">{formatTime(notification.createdAt)}</span>
+      </div>
+    </button>
+  );
+
+  // Empty state
+  const EmptyState = () => (
+    <Card className="p-12 text-center mt-4">
+      <Bell className="w-16 h-16 text-muted-foreground mx-auto mb-4 opacity-40" />
+      <h3 className="text-lg font-bold mb-1">Không có thông báo</h3>
+      <p className="text-muted-foreground text-sm">Chưa có thông báo nào trong mục này.</p>
+    </Card>
+  );
+
+  const tabCounts = {
+    all: notifications.filter((n) => !n.read).length,
+    social: notifications.filter((n) => !n.read && getCategory(n.type) === 'social').length,
+    orders: notifications.filter((n) => !n.read && getCategory(n.type) === 'orders').length,
+    promos: notifications.filter((n) => !n.read && getCategory(n.type) === 'promos').length,
+    system: notifications.filter((n) => !n.read && getCategory(n.type) === 'system').length,
   };
 
   return (
@@ -131,10 +153,10 @@ export function NotificationsPage({ onNavigate }: NotificationsPageProps) {
               <ArrowLeft className="w-6 h-6" />
             </button>
             <div className="flex-1">
-              <h1 className="text-xl font-bold">Notifications</h1>
+              <h1 className="text-xl font-bold">Thông báo</h1>
               {unreadCount > 0 && (
                 <p className="text-sm text-muted-foreground">
-                  {unreadCount} unread notification{unreadCount !== 1 ? 's' : ''}
+                  {unreadCount} thông báo chưa đọc
                 </p>
               )}
             </div>
@@ -151,71 +173,71 @@ export function NotificationsPage({ onNavigate }: NotificationsPageProps) {
       </div>
 
       <div className="max-w-4xl mx-auto px-4 py-6">
-        {/* Actions */}
-        <div className="flex gap-2 mb-6">
-          <Button variant="outline" size="sm" className="rounded-full">
-            Mark all as read
-          </Button>
-          <Button variant="ghost" size="sm" className="rounded-full">
-            Clear all
-          </Button>
-        </div>
+        {/* Action Buttons */}
+        {notifications.length > 0 && (
+          <div className="flex gap-2 mb-5">
+            <Button
+              variant="outline"
+              size="sm"
+              className="rounded-full gap-2"
+              onClick={handleMarkAllRead}
+              disabled={unreadCount === 0}
+            >
+              <CheckCheck className="w-4 h-4" />
+              Đánh dấu tất cả đã đọc
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="rounded-full gap-2 text-muted-foreground hover:text-destructive"
+              onClick={handleClearAll}
+            >
+              <Trash2 className="w-4 h-4" />
+              Xóa tất cả
+            </Button>
+          </div>
+        )}
 
         {/* Tabs */}
-        <Tabs defaultValue="all" className="space-y-4">
-          <TabsList className="grid w-full grid-cols-4 bg-muted rounded-xl p-1">
-            <TabsTrigger value="all" className="rounded-lg">
-              All ({unreadCount})
-            </TabsTrigger>
-            <TabsTrigger value="orders" className="rounded-lg">
-              Orders
-            </TabsTrigger>
-            <TabsTrigger value="promos" className="rounded-lg">
-              Promos
-            </TabsTrigger>
-            <TabsTrigger value="social" className="rounded-lg">
-              Social
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="all" className="space-y-2">
-            {[...notifications.orders, ...notifications.promos, ...notifications.social]
-              .sort((a, b) => a.id - b.id)
-              .reverse()
-              .map((notification) => (
-                <NotificationItem key={notification.id} notification={notification} />
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+          <ScrollArea className="w-full" type="scroll">
+            <TabsList className="flex w-max gap-1 bg-muted rounded-xl p-1">
+              {[
+                { value: 'all', label: 'Tất cả', icon: <Bell className="w-3.5 h-3.5" /> },
+                { value: 'social', label: 'Cộng đồng', icon: <Users className="w-3.5 h-3.5" /> },
+                { value: 'orders', label: 'Đơn hàng', icon: <ShoppingBag className="w-3.5 h-3.5" /> },
+                { value: 'promos', label: 'Ưu đãi', icon: <Gift className="w-3.5 h-3.5" /> },
+                { value: 'system', label: 'Hệ thống', icon: <AlertCircle className="w-3.5 h-3.5" /> },
+              ].map((tab) => (
+                <TabsTrigger
+                  key={tab.value}
+                  value={tab.value}
+                  className="rounded-lg flex items-center gap-1.5 px-3 py-1.5 whitespace-nowrap text-sm"
+                >
+                  {tab.icon}
+                  {tab.label}
+                  {tabCounts[tab.value as keyof typeof tabCounts] > 0 && (
+                    <Badge className="ml-0.5 h-4 min-w-4 flex items-center justify-center p-0 bg-[#FF6B35] text-white text-[10px] px-1">
+                      {tabCounts[tab.value as keyof typeof tabCounts]}
+                    </Badge>
+                  )}
+                </TabsTrigger>
               ))}
-          </TabsContent>
+            </TabsList>
+          </ScrollArea>
 
-          <TabsContent value="orders" className="space-y-2">
-            {notifications.orders.map((notification) => (
-              <NotificationItem key={notification.id} notification={notification} />
-            ))}
-          </TabsContent>
-
-          <TabsContent value="promos" className="space-y-2">
-            {notifications.promos.map((notification) => (
-              <NotificationItem key={notification.id} notification={notification} />
-            ))}
-          </TabsContent>
-
-          <TabsContent value="social" className="space-y-2">
-            {notifications.social.map((notification) => (
-              <NotificationItem key={notification.id} notification={notification} />
-            ))}
-          </TabsContent>
+          {(['all', 'social', 'orders', 'promos', 'system'] as const).map((tab) => (
+            <TabsContent key={tab} value={tab} className="space-y-2 mt-4">
+              {filterByTab(tab).length === 0 ? (
+                <EmptyState />
+              ) : (
+                filterByTab(tab).map((notification) => (
+                  <NotificationItem key={notification.id} notification={notification} />
+                ))
+              )}
+            </TabsContent>
+          ))}
         </Tabs>
-
-        {/* Empty State */}
-        {unreadCount === 0 && (
-          <Card className="p-12 text-center mt-8">
-            <Bell className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
-            <h3 className="text-xl font-bold mb-2">You're all caught up!</h3>
-            <p className="text-muted-foreground">
-              No new notifications at the moment
-            </p>
-          </Card>
-        )}
       </div>
     </div>
   );

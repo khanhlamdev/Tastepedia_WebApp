@@ -1,0 +1,66 @@
+.store-dashboard-wrapper {
+    display: flex;
+    min-height: 100vh;
+    background-color: #F3F4F6 !important;
+    width: 100%;
+    /* Prevent any inherited background or color from App.tsx parent wrapper */
+    isolation: isolate;
+    contain: layout style;
+    color: #111827;
+    font-size: 16px;
+    line-height: 1.5;
+}
+
+.store-dashboard-sidebar {
+    width: 260px;
+    /* Slightly wider to be safe */
+    background-color: white;
+    border-right: 1px solid #E5E7EB;
+    display: flex;
+    flex-direction: column;
+    position: fixed;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    z-index: 50;
+    box-shadow: 1px 0 2px rgba(0, 0, 0, 0.02);
+}
+
+.store-dashboard-main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    margin-left: 260px;
+    min-height: 100vh;
+    width: calc(100% - 260px);
+    overflow-x: hidden;
+    position: relative;
+    box-sizing: border-box;
+}
+
+@media (max-width: 768px) {
+    .store-dashboard-sidebar {
+        display: none !important;
+    }
+
+    .store-dashboard-main {
+        margin-left: 0;
+        width: 100%;
+        padding-bottom: 85px;
+        /* space for mobile nav */
+    }
+}
+
+.store-dashboard-content {
+    padding: 2rem;
+    flex: 1;
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+}
+
+@media (max-width: 768px) {
+    .store-dashboard-content {
+        padding: 1rem;
+    }
+}

@@ -139,4 +139,10 @@ public class User implements Serializable {
 
     public java.util.Map<String, Object> getPreferences() { return preferences; }
     public void setPreferences(java.util.Map<String, Object> preferences) { this.preferences = preferences; }
+
+    // --- STORE ROLE ---
+    private String storeId; // Dùng khi role = "STORE", trỏ đến collection stores
+
+    public String getStoreId() { return storeId; }
+    public void setStoreId(String storeId) { this.storeId = storeId; }
 }
