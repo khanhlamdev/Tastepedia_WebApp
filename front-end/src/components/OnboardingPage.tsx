@@ -142,7 +142,8 @@ export function OnboardingPage({ onComplete }: OnboardingPageProps) {
         // FINISH - Save to Backend & LocalStorage
         try {
           // Save to Backend
-          await fetch('http://localhost:8080/api/users/profile', {
+          const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+          await fetch(`${API_BASE}/api/users/profile`, {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             credentials: 'include',

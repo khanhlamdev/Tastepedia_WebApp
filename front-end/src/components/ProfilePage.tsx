@@ -17,7 +17,8 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [errorMsg, setErrorMsg] = useState('');
 
   useEffect(() => {
-    fetch('http://localhost:8080/api/users/profile', { credentials: 'include' })
+    const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+    fetch(`${API_BASE}/api/users/profile`, { credentials: 'include' })
       .then(async res => {
         if (res.ok) return res.json();
         const text = await res.text();

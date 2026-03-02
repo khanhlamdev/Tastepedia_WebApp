@@ -240,7 +240,8 @@ function EnhancedCreateRecipeForm() {
             if (mainImageFile) formData.append('mainImage', mainImageFile);
             subImageFiles.forEach(file => formData.append('subImages', file));
 
-            const res = await fetch('http://localhost:8080/api/recipes/create', {
+            const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+            const res = await fetch(`${API_BASE}/api/recipes/create`, {
                 method: 'POST',
                 body: formData,
                 credentials: 'include' // Important for session

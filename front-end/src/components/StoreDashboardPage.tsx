@@ -16,7 +16,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '
 import { Input } from './ui/input';
 import './StoreDashboardPage.css';
 
-const API_URL = 'http://localhost:8080/api';
+const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api` : 'http://localhost:8080/api';
 
 interface OrderItem { name: string; qty: number; price: number; imageUrl?: string; }
 interface Order {
@@ -120,8 +120,9 @@ export function StoreDashboardPage() {
     // WebSocket Configuration
     useEffect(() => {
         if (!user?.storeId) return;
+        const wsUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
         const client = new Client({
-            webSocketFactory: () => new SockJS(`http://localhost:8080/ws`),
+            webSocketFactory: () => new SockJS(`${wsUrl}/ws`),
             reconnectDelay: 5000,
             onConnect: () => {
                 client.subscribe(`/topic/store/${user.storeId}/new-order`, (frame) => {

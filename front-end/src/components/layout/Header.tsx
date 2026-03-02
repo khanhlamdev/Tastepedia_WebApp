@@ -30,7 +30,8 @@ export function Header() {
 
   const handleLogout = async () => {
     try {
-      await axios.post('http://localhost:8080/api/auth/logout', {}, { withCredentials: true });
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      await axios.post(`${API_BASE}/api/auth/logout`, {}, { withCredentials: true });
     } catch (error) {
       console.error("Logout failed", error);
     } finally {

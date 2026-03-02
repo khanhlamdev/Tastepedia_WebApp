@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, ChefHat, Sparkles, Check, AlertCircle, Clock, Activity, Utensils,Leaf, Search } from 'lucide-react';
+import { ArrowLeft, ChefHat, Sparkles, Check, AlertCircle, Clock, Activity, Utensils, Leaf, Search } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
 import { Label } from './ui/label';
@@ -121,7 +121,8 @@ export function MealPlanningPage() {
         }, 300);
 
         try {
-            const res = await fetch('http://localhost:8080/api/ai/meal-plan', {
+            const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+            const res = await fetch(`${API_BASE}/api/ai/meal-plan`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

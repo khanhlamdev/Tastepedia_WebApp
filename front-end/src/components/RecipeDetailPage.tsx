@@ -82,7 +82,8 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
 
   useEffect(() => {
     if (recipeId) {
-      fetch(`http://localhost:8080/api/recipes/${recipeId}`)
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      fetch(`${API_BASE}/api/recipes/${recipeId}`)
         .then(res => res.json())
         .then(data => {
           const mappedData = { ...data, id: data.id || data._id };
@@ -96,7 +97,8 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
   // Check if recipe is favorited
   useEffect(() => {
     if (recipeId) {
-      fetch(`http://localhost:8080/api/favorites/check/${recipeId}`, {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      fetch(`${API_BASE}/api/favorites/check/${recipeId}`, {
         credentials: 'include'
       })
         .then(res => res.json())
@@ -143,9 +145,10 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
 
     try {
       const method = isLiked ? 'DELETE' : 'POST';
-      console.log(`Toggling favorite: ${method} /api/favorites/${recipeId}`);
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      console.log(`Toggling favorite: ${method} ${API_BASE}/api/favorites/${recipeId}`);
 
-      const res = await fetch(`http://localhost:8080/api/favorites/${recipeId}`, {
+      const res = await fetch(`${API_BASE}/api/favorites/${recipeId}`, {
         method,
         credentials: 'include'
       });
@@ -172,7 +175,8 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
   };
 
   useEffect(() => {
-    fetch(`http://localhost:8080/api/reviews/${currentRecipeId}`)
+    const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+    fetch(`${API_BASE}/api/reviews/${currentRecipeId}`)
       .then(res => res.json())
       .then(data => setReviews(data))
       .catch(err => console.error("Error fetching reviews:", err));
@@ -205,7 +209,8 @@ export function RecipeDetailPage({ onNavigate, recipeId: propRecipeId }: RecipeD
     };
 
     try {
-      const response = await fetch('http://localhost:8080/api/reviews/add', {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      const response = await fetch(`${API_BASE}/api/reviews/add`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(reviewPayload)

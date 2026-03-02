@@ -37,9 +37,10 @@ export function AdminRecipes() {
     const fetchData = async () => {
         setIsLoading(true);
         try {
+            const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
             const [recRes, catRes] = await Promise.all([
-                axios.get('http://localhost:8080/api/admin/recipes', { withCredentials: true }),
-                axios.get('http://localhost:8080/api/admin/categories', { withCredentials: true })
+                axios.get(`${API_BASE}/api/admin/recipes`, { withCredentials: true }),
+                axios.get(`${API_BASE}/api/admin/categories`, { withCredentials: true })
             ]);
             setRecipes(recRes.data);
             setCategories(catRes.data);
@@ -56,7 +57,8 @@ export function AdminRecipes() {
 
     const handleToggleApproval = async (id: string, currentStatus: boolean) => {
         try {
-            await axios.put(`http://localhost:8080/api/admin/recipes/${id}/approve`, { isApproved: !currentStatus }, { withCredentials: true });
+            const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+            await axios.put(`${API_BASE}/api/admin/recipes/${id}/approve`, { isApproved: !currentStatus }, { withCredentials: true });
             fetchData();
         } catch (error) {
             console.error("Lỗi duyệt công thức:", error);
@@ -66,7 +68,8 @@ export function AdminRecipes() {
     const handleDeleteRecipe = async (id: string) => {
         if (!window.confirm("Xóa vĩnh viễn công thức này khỏi hệ thống?")) return;
         try {
-            await axios.delete(`http://localhost:8080/api/admin/recipes/${id}`, { withCredentials: true });
+            const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+            await axios.delete(`${API_BASE}/api/admin/recipes/${id}`, { withCredentials: true });
             fetchData();
         } catch (error) {
             console.error("Lỗi xóa công thức:", error);
@@ -77,7 +80,8 @@ export function AdminRecipes() {
         e.preventDefault();
         if (!newCatName.trim()) return;
         try {
-            await axios.post('http://localhost:8080/api/admin/categories', {
+            const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+            await axios.post(`${API_BASE}/api/admin/categories`, {
                 name: newCatName,
                 description: newCatDesc,
                 type: newCatType
@@ -95,7 +99,8 @@ export function AdminRecipes() {
     const handleDeleteCategory = async (id: string) => {
         if (!window.confirm("Xóa danh mục này? Các món ăn đang dùng tag này có thể bị ảnh hưởng.")) return;
         try {
-            await axios.delete(`http://localhost:8080/api/admin/categories/${id}`, { withCredentials: true });
+            const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+            await axios.delete(`${API_BASE}/api/admin/categories/${id}`, { withCredentials: true });
             fetchData();
         } catch (error) {
             console.error("Lỗi xóa danh mục:", error);

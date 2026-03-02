@@ -60,7 +60,8 @@ export function AdminLayout() {
 
     const handleLogout = async () => {
         try {
-            await fetch('http://localhost:8080/api/auth/logout', { method: 'POST', credentials: 'include' });
+            const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+            await fetch(`${API_BASE}/api/auth/logout`, { method: 'POST', credentials: 'include' });
         } finally {
             localStorage.removeItem('user');
             navigate('/auth');

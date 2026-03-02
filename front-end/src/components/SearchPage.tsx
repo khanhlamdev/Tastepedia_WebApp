@@ -96,7 +96,8 @@ export function SearchPage({ onNavigate, initialQuery = '' }: SearchPageProps) {
         if (min !== undefined) params.append('minPrice', min.toString());
         if (max !== undefined) params.append('maxPrice', max.toString());
 
-        const res = await fetch(`http://localhost:8080/api/recipes/search?${params.toString()}`);
+        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+        const res = await fetch(`${API_BASE}/api/recipes/search?${params.toString()}`);
         if (res.ok) {
           const data = await res.json();
           // Map response

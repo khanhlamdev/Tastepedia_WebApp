@@ -53,7 +53,8 @@ export function CheckoutPaymentPage({ onNavigate }: CheckoutPaymentPageProps) {
         totalAmount,
       };
 
-      const res = await axios.post('http://localhost:8080/api/orders', payload, { withCredentials: true });
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      const res = await axios.post(`${API_BASE}/api/orders`, payload, { withCredentials: true });
       const order = res.data;
 
       // Xoá cart sau khi đặt thành công
@@ -104,8 +105,8 @@ export function CheckoutPaymentPage({ onNavigate }: CheckoutPaymentPageProps) {
               {/* Credit/Debit Card */}
               <label
                 className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'card'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50'
                   }`}
               >
                 <RadioGroupItem value="card" className="mt-0.5" />
@@ -123,8 +124,8 @@ export function CheckoutPaymentPage({ onNavigate }: CheckoutPaymentPageProps) {
               {/* E-Wallet */}
               <label
                 className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'wallet'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50'
                   }`}
               >
                 <RadioGroupItem value="wallet" className="mt-0.5" />
@@ -142,8 +143,8 @@ export function CheckoutPaymentPage({ onNavigate }: CheckoutPaymentPageProps) {
               {/* Cash on Delivery */}
               <label
                 className={`flex items-start gap-3 p-4 border-2 rounded-xl cursor-pointer transition-colors ${paymentMethod === 'cod'
-                    ? 'border-primary bg-primary/5'
-                    : 'border-border hover:border-primary/50'
+                  ? 'border-primary bg-primary/5'
+                  : 'border-border hover:border-primary/50'
                   }`}
               >
                 <RadioGroupItem value="cod" className="mt-0.5" />

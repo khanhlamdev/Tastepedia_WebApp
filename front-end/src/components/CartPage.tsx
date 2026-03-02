@@ -62,9 +62,10 @@ export function CartPage() {
         const ingredientNames = Array.from(new Set(savedCart.map((i: CartItem) => i.name)));
 
         // Fetch stores & products concurrently
+        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
         const [storesRes, productsRes] = await Promise.all([
-          axios.get('http://localhost:8080/api/stores'),
-          axios.post('http://localhost:8080/api/store-products/match', ingredientNames)
+          axios.get(`${API_BASE}/api/stores`),
+          axios.post(`${API_BASE}/api/store-products/match`, ingredientNames)
         ]);
 
         setStores(storesRes.data);
@@ -196,7 +197,8 @@ export function CartPage() {
     };
 
     try {
-      await axios.post('http://localhost:8080/api/orders', orderPayload, { withCredentials: true });
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      await axios.post(`${API_BASE}/api/orders`, orderPayload, { withCredentials: true });
       toast.success("Đặt hàng thành công!");
 
       // Only keep missing items in the cart

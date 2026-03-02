@@ -47,7 +47,7 @@ export default function App() {
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [currentSearchQuery, setCurrentSearchQuery] = useState('');
 
-  const API_URL = "http://localhost:8080/api/auth";
+  const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/auth` : "http://localhost:8080/api/auth";
 
   // --- CHECK SESSION ---
   useEffect(() => {

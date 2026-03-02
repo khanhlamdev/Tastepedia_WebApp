@@ -28,7 +28,7 @@ interface AuthPageProps {
 }
 
 export function AuthPage({ onComplete, onNavigate, initialView = 'login' }: AuthPageProps) {
-  const API_URL = "http://localhost:8080/api/auth";
+  const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/auth` : "http://localhost:8080/api/auth";
 
   // --- STATE QUẢN LÝ GIAO DIỆN ---
   const [isLogin, setIsLogin] = useState(initialView === 'login');

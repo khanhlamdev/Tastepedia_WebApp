@@ -136,7 +136,8 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
 
   const fetchPosts = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/community/posts');
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      const res = await fetch(`${API_BASE}/api/community/posts`);
       const data = await res.json();
       // Tính toán phần trăm cho Poll nếu có
       const processedData = data.map((post: any) => {
@@ -192,7 +193,8 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     }
 
     try {
-      const res = await fetch('http://localhost:8080/api/community/create', {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      const res = await fetch(`${API_BASE}/api/community/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -223,7 +225,8 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
   const openPostDetail = async (post: PostData) => {
     setSelectedPost(post);
     try {
-      const res = await fetch(`http://localhost:8080/api/community/${post.id}/comments`, { credentials: 'include' });
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      const res = await fetch(`${API_BASE}/api/community/${post.id}/comments`, { credentials: 'include' });
       if (res.ok) setPostComments(await res.json());
     } catch (e) { console.error(e); }
   };
@@ -259,7 +262,8 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
     }
 
     try {
-      const res = await fetch(`http://localhost:8080/api/community/${selectedPost.id}/comments`, {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      const res = await fetch(`${API_BASE}/api/community/${selectedPost.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -283,7 +287,8 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
   const handleVote = async (postId: string, optionId: number) => {
     console.log('Voting for postId:', postId, 'optionId:', optionId, 'type:', typeof optionId);
     try {
-      const res = await fetch(`http://localhost:8080/api/community/${postId}/vote?optionId=${optionId}`, {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      const res = await fetch(`${API_BASE}/api/community/${postId}/vote?optionId=${optionId}`, {
         method: 'POST',
         credentials: 'include'
       });
@@ -343,7 +348,8 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
         const formData = new FormData();
         formData.append('file', file);
 
-        const res = await fetch(`http://localhost:8080/api/community/upload?folder=${targetFolder}`, {
+        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+        const res = await fetch(`${API_BASE}/api/community/upload?folder=${targetFolder}`, {
           method: 'POST',
           body: formData,
           credentials: 'include'
@@ -377,7 +383,8 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
   const handleDeletePost = async (postId: string) => {
     if (!window.confirm("Are you sure you want to delete this post?")) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/community/${postId}`, {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      const res = await fetch(`${API_BASE}/api/community/${postId}`, {
         method: 'DELETE',
         credentials: 'include'
       });
@@ -424,7 +431,8 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
   const handleEditCommentSubmit = async () => {
     if (!editingComment || !editCommentContent.trim()) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/community/comments/${editingComment.id}`, {
+      const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+      const res = await fetch(`${API_BASE}/api/community/comments/${editingComment.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -716,7 +724,8 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
 
       // 2. Gọi API ngầm
       try {
-        const res = await fetch(`http://localhost:8080/api/community/${post.id}/like`, {
+        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+        const res = await fetch(`${API_BASE}/api/community/${post.id}/like`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',

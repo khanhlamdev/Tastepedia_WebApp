@@ -16,7 +16,8 @@ export function AdminDashboard() {
         setIsLoading(true);
         setError(null);
         try {
-            const response = await axios.get('http://localhost:8080/api/admin/analytics', { withCredentials: true });
+            const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+            const response = await axios.get(`${API_BASE}/api/admin/analytics`, { withCredentials: true });
             setData(response.data);
         } catch (err: any) {
             console.error("Lỗi khi tải dữ liệu phân tích:", err);
