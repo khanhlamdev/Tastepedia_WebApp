@@ -18,6 +18,8 @@ interface Recipe {
     rating?: number;
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
 export function FavoritesPage({ onNavigate }: FavoritesPageProps) {
     const [favorites, setFavorites] = useState<Recipe[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -28,7 +30,7 @@ export function FavoritesPage({ onNavigate }: FavoritesPageProps) {
 
     const fetchFavorites = async () => {
         try {
-            const res = await fetch('http://localhost:8080/api/favorites', {
+            const res = await fetch(`${API_BASE}/api/favorites`, {
                 credentials: 'include'
             });
 
@@ -45,7 +47,7 @@ export function FavoritesPage({ onNavigate }: FavoritesPageProps) {
 
     const removeFavorite = async (recipeId: string) => {
         try {
-            const res = await fetch(`http://localhost:8080/api/favorites/${recipeId}`, {
+            const res = await fetch(`${API_BASE}/api/favorites/${recipeId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });

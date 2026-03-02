@@ -120,7 +120,7 @@ export function StoreDashboardPage() {
     // WebSocket Configuration
     useEffect(() => {
         if (!user?.storeId) return;
-        const wsUrl = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+        const wsUrl = import.meta.env.VITE_API_URL || ${import.meta.env.VITE_API_URL || 'http://localhost:8080'};
         const client = new Client({
             webSocketFactory: () => new SockJS(`${wsUrl}/ws`),
             reconnectDelay: 5000,

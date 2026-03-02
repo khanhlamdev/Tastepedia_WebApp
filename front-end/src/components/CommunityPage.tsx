@@ -20,6 +20,9 @@ import {
   DropdownMenuTrigger,
 } from "./ui/dropdown-menu";
 
+
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
 function formatTimeAgo(dateString: string): string {
   const date = new Date(dateString);
   const now = new Date();
@@ -125,7 +128,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
 
   const fetchLeaderboard = async () => {
     try {
-      const res = await fetch('http://localhost:8080/api/community/leaderboard');
+      const res = await fetch(`${API_BASE}/api/community/leaderboard`);
       if (res.ok) {
         setTopContributors(await res.json());
       }
@@ -233,7 +236,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
 
   const handleCommentLike = async (commentId: string) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/community/comments/${commentId}/like`, {
+      const res = await fetch(`${API_BASE}/api/community/comments/${commentId}/like`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -398,7 +401,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
   const handleEditPostSubmit = async () => {
     if (!editingPost || !editPostContent.trim()) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/community/${editingPost.id}`, {
+      const res = await fetch(`${API_BASE}/api/community/${editingPost.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -417,7 +420,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
   const handleDeleteComment = async (commentId: string) => {
     if (!window.confirm("Are you sure you want to delete this comment?")) return;
     try {
-      const res = await fetch(`http://localhost:8080/api/community/comments/${commentId}`, {
+      const res = await fetch(`${API_BASE}/api/community/comments/${commentId}`, {
         method: 'DELETE',
         credentials: 'include'
       });
@@ -447,7 +450,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
 
   const handleSavePost = async (postId: string) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/community/${postId}/save`, {
+      const res = await fetch(`${API_BASE}/api/community/${postId}/save`, {
         method: 'POST',
         credentials: 'include'
       });
@@ -461,7 +464,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
 
   const handleHidePost = async (postId: string) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/community/${postId}/hide`, {
+      const res = await fetch(`${API_BASE}/api/community/${postId}/hide`, {
         method: 'POST',
         credentials: 'include'
       });
@@ -477,7 +480,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
 
   const handleReportPost = async (postId: string) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/community/${postId}/report`, {
+      const res = await fetch(`${API_BASE}/api/community/${postId}/report`, {
         method: 'POST',
         credentials: 'include'
       });
@@ -491,7 +494,7 @@ export function CommunityPage({ onNavigate }: CommunityPageProps) {
 
   const handleReportComment = async (commentId: string) => {
     try {
-      const res = await fetch(`http://localhost:8080/api/community/comments/${commentId}/report`, {
+      const res = await fetch(`${API_BASE}/api/community/comments/${commentId}/report`, {
         method: 'POST',
         credentials: 'include'
       });

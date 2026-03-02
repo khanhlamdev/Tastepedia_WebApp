@@ -47,7 +47,7 @@ export function MyRecipesPage({ onNavigate }: MyRecipesPageProps) {
 
     const deleteRecipe = async (recipeId: string) => {
         try {
-            const res = await fetch(`http://localhost:8080/api/recipes/${recipeId}`, {
+            const res = await fetch(`${import.meta.env.VITE_API_URL || "http://localhost:8080"}/api/recipes/${recipeId}`, {
                 method: 'DELETE',
                 credentials: 'include'
             });

@@ -23,6 +23,8 @@ const CUISINES = [
     'Mexico', 'Tây Ban Nha', 'Đức', 'Nga', 'Hy Lạp', 'Thổ Nhĩ Kỳ', 'Indonesia', 'Malaysia', 'Singapore'
 ];
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
 interface EditRecipePageProps {
     onNavigate: (page: string) => void;
     recipeId?: string | null; // Now optional - we'll get from URL params
@@ -78,7 +80,7 @@ export function EditRecipePage({ onNavigate, recipeId: propRecipeId }: EditRecip
     // Load existing recipe data
     useEffect(() => {
         if (recipeId) {
-            fetch(`http://localhost:8080/api/recipes/${recipeId}`, { credentials: 'include' })
+            fetch(`${API_BASE}/api/recipes/${recipeId}`, { credentials: 'include' })
                 .then(res => res.json())
                 .then(data => {
                     setTitle(data.title || '');
@@ -226,7 +228,7 @@ export function EditRecipePage({ onNavigate, recipeId: propRecipeId }: EditRecip
             }
 
             const method = recipeId ? 'PUT' : 'POST';
-            const url = recipeId ? `http://localhost:8080/api/recipes/${recipeId}` : `http://localhost:8080/api/recipes/create`;
+            const url = recipeId ? `${API_BASE}/api/recipes/${recipeId}` : `${API_BASE}/api/recipes/create`;
 
             const response = await fetch(url, {
                 method: method,

@@ -12,6 +12,8 @@ interface ReportedContent {
     createdAt: string;
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
 export function AdminModeration() {
     const [reportedPosts, setReportedPosts] = useState<ReportedContent[]>([]);
     const [reportedComments, setReportedComments] = useState<ReportedContent[]>([]);
@@ -19,7 +21,7 @@ export function AdminModeration() {
 
     const fetchReports = async () => {
         try {
-            const response = await axios.get('http://localhost:8080/api/admin/reports', { withCredentials: true });
+            const response = await axios.get(`${API_BASE}/api/admin/reports`, { withCredentials: true });
             const { reportedPosts, reportedComments } = response.data;
 
             setReportedPosts(reportedPosts.map((p: any) => ({ ...p, type: 'post' })));
@@ -38,7 +40,7 @@ export function AdminModeration() {
     const handleDelete = async (id: string, type: 'post' | 'comment') => {
         try {
             if (!window.confirm("Xác nhận xóa nội dung vi phạm này?")) return;
-            const url = `http://localhost:8080/api/admin/reports/${type}s/${id}`;
+            const url = `${API_BASE}/api/admin/reports/${type}s/${id}`;
             await axios.delete(url, { withCredentials: true });
             fetchReports();
         } catch (error) {
@@ -49,7 +51,7 @@ export function AdminModeration() {
 
     const handleDismiss = async (id: string, type: 'post' | 'comment') => {
         try {
-            const url = `http://localhost:8080/api/admin/reports/${type}s/${id}/dismiss`;
+            const url = `${API_BASE}/api/admin/reports/${type}s/${id}/dismiss`;
             await axios.put(url, {}, { withCredentials: true });
             fetchReports();
         } catch (error) {

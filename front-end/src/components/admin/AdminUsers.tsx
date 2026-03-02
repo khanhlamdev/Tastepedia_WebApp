@@ -17,13 +17,15 @@ interface UserData {
     profileImageUrl?: string;
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
 export function AdminUsers() {
     const [users, setUsers] = useState<UserData[]>([]);
     const [isLoading, setIsLoading] = useState(true);
 
     const fetchUsers = async () => {
         try {
-            const response = await axios.get('http://localhost:8080/api/admin/users', { withCredentials: true });
+            const response = await axios.get(`${API_BASE}/api/admin/users`, { withCredentials: true });
             setUsers(response.data);
         } catch (error) {
             console.error("Lỗi khi tải danh sách người dùng:", error);
@@ -39,7 +41,7 @@ export function AdminUsers() {
     const handleRoleChange = async (userId: string, newRole: string) => {
         try {
             if (!window.confirm(`Thay đổi quyền thành ${newRole}?`)) return;
-            await axios.put(`http://localhost:8080/api/admin/users/${userId}/role`, { role: newRole }, { withCredentials: true });
+            await axios.put(`${API_BASE}/api/admin/users/${userId}/role`, { role: newRole }, { withCredentials: true });
             fetchUsers();
         } catch (error) {
             console.error("Lỗi khi đổi role:", error);
@@ -49,7 +51,7 @@ export function AdminUsers() {
 
     const handleVerify = async (userId: string, currentStatus: boolean) => {
         try {
-            await axios.put(`http://localhost:8080/api/admin/users/${userId}/verify`, { verified: !currentStatus }, { withCredentials: true });
+            await axios.put(`${API_BASE}/api/admin/users/${userId}/verify`, { verified: !currentStatus }, { withCredentials: true });
             fetchUsers();
         } catch (error) {
             console.error("Lỗi khi xác minh:", error);
@@ -59,7 +61,7 @@ export function AdminUsers() {
     const handleBan = async (userId: string) => {
         try {
             if (!window.confirm("Bạn có chắc chắn muốn xóa vĩnh viễn user này?")) return;
-            await axios.delete(`http://localhost:8080/api/admin/users/${userId}`, { withCredentials: true });
+            await axios.delete(`${API_BASE}/api/admin/users/${userId}`, { withCredentials: true });
             fetchUsers();
         } catch (error) {
             console.error("Lỗi khi xóa tài khoản:", error);

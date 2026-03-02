@@ -15,6 +15,8 @@ interface EditProfilePageProps {
     onNavigate?: (page: string) => void; // Legacy
 }
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
 export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
     const navigate = useNavigate();
     const [isLoading, setIsLoading] = useState(true);
@@ -57,7 +59,7 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
 
     // Load user data
     useEffect(() => {
-        fetch('http://localhost:8080/api/users/profile', { credentials: 'include' })
+        fetch(`${API_BASE}/api/users/profile`, { credentials: 'include' })
             .then(res => res.json())
             .then(data => {
                 setUser(data);
@@ -92,7 +94,7 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
             const formData = new FormData();
             formData.append('avatar', avatarFile);
 
-            const res = await fetch('http://localhost:8080/api/users/upload-avatar', {
+            const res = await fetch(`${API_BASE}/api/users/upload-avatar`, {
                 method: 'POST',
                 credentials: 'include',
                 body: formData
@@ -116,7 +118,7 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
 
     const handleUpdateProfile = async () => {
         try {
-            const res = await fetch('http://localhost:8080/api/users/profile', {
+            const res = await fetch(`${API_BASE}/api/users/profile`, {
                 method: 'PUT',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -141,7 +143,7 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
         setIsSendingOTP(true);
         try {
             // In real app: use /forgot-password endpoint with email
-            const res = await fetch('http://localhost:8080/api/auth/forgot-password', {
+            const res = await fetch(`${API_BASE}/api/auth/forgot-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'text/plain' },
                 body: email // Send user email
@@ -169,7 +171,7 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
         setIsChangingPassword(true);
         try {
             // Updated to use the correct AuthController endpoint
-            const res = await fetch('http://localhost:8080/api/auth/reset-password-verify', {
+            const res = await fetch(`${API_BASE}/api/auth/reset-password-verify`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -208,7 +210,7 @@ export function EditProfilePage({ onNavigate }: EditProfilePageProps) {
 
         setIsChangingPassword(true);
         try {
-            const res = await fetch('http://localhost:8080/api/users/change-password', {
+            const res = await fetch(`${API_BASE}/api/users/change-password`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',

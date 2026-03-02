@@ -214,6 +214,8 @@ const categories = [
 ];
 
 
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
 export function HomePage({ onNavigate }: HomePageProps) {
   const navigate = useNavigate();
   const [feedbackOpen, setFeedbackOpen] = useState(false);
@@ -232,7 +234,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
   useEffect(() => {
     const fetchRecipes = async () => {
       try {
-        const res = await fetch('http://localhost:8080/api/recipes/latest');
+        const res = await fetch(`${API_BASE}/api/recipes/latest`);
         const data = await res.json();
 
         // Map data to match UI needs
@@ -255,7 +257,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
 
     const fetchRecommendedRecipes = async () => {
       try {
-        const res = await fetch('http://localhost:8080/api/recipes/recommended', {
+        const res = await fetch(`${API_BASE}/api/recipes/recommended`, {
           credentials: 'include' // Send session cookie
         });
         const data = await res.json();
