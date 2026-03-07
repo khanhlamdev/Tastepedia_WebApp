@@ -27,7 +27,7 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource())) // Kích hoạt CORS config
                 .csrf(csrf -> csrf.disable()) // Tắt CSRF
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/api/auth/**", "/api/recipes/**", "/api/favorites/**").permitAll()
+                        .requestMatchers("/api/auth/**", "/api/recipes/**", "/api/favorites/**", "/api/health").permitAll()
                         .requestMatchers("/api/community/**", "/api/reviews/**", "/api/users/**", "/api/ai/**").permitAll()
                         .requestMatchers("/api/notifications/**").permitAll()
                         .requestMatchers("/api/orders/**", "/api/stores/**", "/api/store-products/**").permitAll()

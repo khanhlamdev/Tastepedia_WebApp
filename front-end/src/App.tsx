@@ -46,8 +46,25 @@ export default function App() {
   const [selectedRecipe, setSelectedRecipe] = useState<string | null>(null);
   const [isLoadingSession, setIsLoadingSession] = useState(true);
   const [currentSearchQuery, setCurrentSearchQuery] = useState('');
+  const [isServerWakingUp, setIsServerWakingUp] = useState(false);
 
-  const API_URL = import.meta.env.VITE_API_URL ? `${import.meta.env.VITE_API_URL}/api/auth` : "http://localhost:8080/api/auth";
+  const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+  const API_URL = `${BASE_URL}/api/auth`;
+
+  // --- KEEP-ALIVE PING ---
+  // Pings the backend every 10 minutes so Render free-tier doesn't spin down.
+  // Also runs once on mount to warm up the server proactively.
+  useEffect(() => {
+    const HEALTH_URL = `${BASE_URL}/api/health`;
+    const ping = () => fetch(HEALTH_URL, { method: 'GET' }).catch(() => { });
+
+    // Ping immediately on mount to wake up backend
+    ping();
+
+    // Then ping every 10 minutes
+    const interval = setInterval(ping, 10 * 60 * 1000);
+    return () => clearInterval(interval);
+  }, [BASE_URL]);
 
   // --- CHECK SESSION ---
   useEffect(() => {
@@ -55,11 +72,20 @@ export default function App() {
       try {
         const res = await axios.get(`${API_URL}/me`, { withCredentials: true });
         localStorage.setItem('user', JSON.stringify(res.data));
+        setIsServerWakingUp(false);
         // If on auth page and logged in, redirect to home
         if (location.pathname === '/auth' || location.pathname === '/login' || location.pathname === '/signup') {
           navigate('/');
         }
-      } catch (error) {
+      } catch (error: any) {
+        // Network error (server sleeping / CORS due to 503) → show waking-up state
+        if (!error?.response) {
+          setIsServerWakingUp(true);
+          // Retry after 10 seconds
+          setTimeout(checkLoginStatus, 10000);
+          return;
+        }
+        setIsServerWakingUp(false);
         console.log("Chưa đăng nhập, vào chế độ khách.");
         localStorage.removeItem('user');
         // Do not redirect here, let the Routes handle access
@@ -116,12 +142,22 @@ export default function App() {
 
   const showMobileNav = !['/auth', '/login', '/signup', '/onboarding', '/store-dashboard'].includes(location.pathname);
 
-  if (isLoadingSession) {
+  if (isLoadingSession || isServerWakingUp) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-white">
-        <div className="flex flex-col items-center gap-4">
+        <div className="flex flex-col items-center gap-6 px-6 text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#FF6B35]"></div>
-          <p className="text-gray-500 text-sm">Đang tải dữ liệu...</p>
+          {isServerWakingUp ? (
+            <>
+              <p className="text-gray-700 font-semibold text-base">☕ Server đang khởi động...</p>
+              <p className="text-gray-400 text-sm max-w-xs">
+                Server đang được đánh thức từ chế độ ngủ. Quá trình này có thể mất tới 60 giây.
+                Bạn không cần làm gì, trang sẽ tự tải lại.
+              </p>
+            </>
+          ) : (
+            <p className="text-gray-500 text-sm">Đang tải dữ liệu...</p>
+          )}
         </div>
       </div>
     );
