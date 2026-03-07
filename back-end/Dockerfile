@@ -23,5 +23,5 @@ COPY --from=build /app/target/*.jar app.jar
 # Expose the application port (Render provides PORT environment variable)
 EXPOSE 8080
 
-# Command to run the application
-ENTRYPOINT ["java", "-jar", "app.jar"]
+# Command to run the application - uses Render's PORT env var if set, otherwise 8080
+CMD ["sh", "-c", "java -jar app.jar --server.port=${PORT:-8080}"]
