@@ -13,7 +13,7 @@ public class EmailService {
 
     public void sendEmail(String toEmail, String subject, String body) {
         SimpleMailMessage message = new SimpleMailMessage();
-        message.setFrom("khanhphantk@gmail.com"); // Email người gửi (trùng với config)
+        message.setFrom("tastepediaverified@gmail.com"); // Phải trùng với spring.mail.username
         message.setTo(toEmail);
         message.setSubject(subject);
         message.setText(body);
