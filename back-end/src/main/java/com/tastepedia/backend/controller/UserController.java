@@ -17,7 +17,6 @@ import java.util.Random;
 
 @RestController
 @RequestMapping("/api/users")
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"}, allowCredentials = "true")
 public class UserController {
 
     @Autowired

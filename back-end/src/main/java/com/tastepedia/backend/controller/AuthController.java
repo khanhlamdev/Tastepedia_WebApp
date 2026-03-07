@@ -21,8 +21,7 @@ import java.util.UUID;
 
 @RestController
 @RequestMapping("/api/auth")
-// Cho phép gửi Cookie (Session ID) qua lại giữa 2 cổng khác nhau
-@CrossOrigin(origins = {"http://localhost:3000", "http://localhost:5173"}, allowCredentials = "true")
+// CORS is handled globally by SimpleCorsFilter + CorsConfig (supports Vercel + localhost)
 public class AuthController {
 
     @Autowired
