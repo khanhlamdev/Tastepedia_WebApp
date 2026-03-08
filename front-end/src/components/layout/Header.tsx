@@ -77,7 +77,7 @@ export function Header() {
                 <Button
                   onClick={() => navigate('/login')}
                   variant="outline"
-                  className="hidden sm:inline-flex rounded-full px-6 h-10"
+                  className="inline-flex rounded-full px-4 sm:px-6 h-10"
                 >
                   Login
                 </Button>

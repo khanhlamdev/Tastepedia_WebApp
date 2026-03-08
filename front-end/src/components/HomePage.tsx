@@ -106,16 +106,13 @@ function TestimonialCard({ testimonial }: { testimonial: typeof TESTIMONIALS[0] 
 
 // Feedback Modal Component
 function FeedbackModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
-  const [selectedMood, setSelectedMood] = useState<'sad' | 'neutral' | 'happy' | null>(null);
   const [submitted, setSubmitted] = useState(false);
 
   const handleSubmit = (mood: 'sad' | 'neutral' | 'happy') => {
-    setSelectedMood(mood);
     setSubmitted(true);
     setTimeout(() => {
       onClose();
       setSubmitted(false);
-      setSelectedMood(null);
     }, 2000);
   };
 
@@ -294,7 +291,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
   return (
     <div className="min-h-screen bg-[#F9F9F9] flex flex-col">
       {/* Header with Auth Check */}
-      <Header onNavigate={onNavigate as any} />
+      <Header />
 
       {/* Main Content */}
       <div className="flex-1">
@@ -330,10 +327,10 @@ export function HomePage({ onNavigate }: HomePageProps) {
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               {categories.map((category) => (
-                <button
+                <div
                   key={category.id}
                   onClick={() => handleCategoryClick(category.id)}
-                  className="group relative block w-full bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 overflow-hidden h-[500px] md:!h-[600px]"
+                  className="group cursor-pointer relative flex flex-col w-full bg-white rounded-3xl shadow-lg hover:shadow-2xl transition-all duration-500 hover:-translate-y-2 overflow-hidden h-[240px] md:h-[260px]"
                 >
                   {/* Background Image */}
                   <div className="absolute inset-0">
@@ -342,47 +339,38 @@ export function HomePage({ onNavigate }: HomePageProps) {
                       alt={category.label}
                       className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
                     />
-                    {/* Gradient Overlay */}
-                    <div className={`absolute inset-0 bg-gradient-to-br ${category.gradient} opacity-40 group-hover:opacity-50 transition-opacity duration-300`}></div>
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/30 to-transparent"></div>
+                    {/* Dark gradient from bottom to improve text contrast naturally without a box */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/40 to-transparent"></div>
                   </div>
 
                   {/* Content Overlay */}
-                  <div className="relative h-full flex flex-col justify-end p-6 text-white">
+                  <div className="relative h-full flex flex-col justify-end p-6 text-white z-10 w-full drop-shadow-[0_2px_4px_rgba(0,0,0,0.8)]">
                     {/* Icon Badge */}
-                    <div className="absolute top-4 right-4 w-12 h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
+                    <div className="absolute top-4 right-4 w-10 h-10 md:w-12 md:h-12 bg-white/20 backdrop-blur-md rounded-2xl flex items-center justify-center shadow-lg group-hover:scale-110 transition-transform duration-300">
                       {category.iconComponent}
                     </div>
 
-                    {/* Text Content */}
-                    <div className="space-y-2">
-                      <h3 className="font-bold text-2xl group-hover:text-[#FFB800] transition-colors">
+                    {/* Text Content with strong drop shadow for "vietsub" style readability */}
+                    <div className="space-y-1">
+                      <h3 className="font-bold text-2xl md:text-3xl group-hover:text-[#FFB800] transition-colors drop-shadow-[0_2px_4px_rgba(0,0,0,1)]">
                         {category.label}
                       </h3>
 
-                      <div className="text-sm font-semibold text-white/90">
+                      <div className="text-sm md:text-base font-semibold text-[#FFB800] drop-shadow-[0_1px_2px_rgba(0,0,0,1)]">
                         {category.count}
                       </div>
 
-                      <div className="text-sm text-white/80">
+                      <div className="text-sm md:text-base text-gray-100 line-clamp-2 mt-1 drop-shadow-[0_1px_2px_rgba(0,0,0,1)] font-medium">
                         {category.description}
-                      </div>
-
-                      {/* Hover Indicator */}
-                      <div className="pt-2 flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-all duration-300">
-                        <span className="text-sm font-semibold">Explore Now</span>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                        </svg>
                       </div>
                     </div>
                   </div>
 
                   {/* Shine Effect on Hover */}
-                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                  <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none">
                     <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           </div>
@@ -446,10 +434,10 @@ export function HomePage({ onNavigate }: HomePageProps) {
                 </div>
               )}
               {trendingRecipes.map((recipe) => (
-                <button
+                <div
                   key={recipe.id}
                   onClick={() => onNavigate('recipe', recipe.id)}
-                  className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                  className="group cursor-pointer bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                 >
                   <div className="relative aspect-[4/3] overflow-hidden">
                     <img
@@ -484,7 +472,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
                       </div>
                     </div>
                   </div>
-                </button>
+                </div>
               ))}
             </div>
           </div>
@@ -504,10 +492,10 @@ export function HomePage({ onNavigate }: HomePageProps) {
 
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
                 {recommendedRecipes.map((recipe) => (
-                  <button
+                  <div
                     key={recipe.id}
                     onClick={() => onNavigate('recipe', recipe.id)}
-                    className="group bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
+                    className="group cursor-pointer bg-white rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1"
                   >
                     <div className="relative aspect-[4/3] overflow-hidden">
                       <img
@@ -542,7 +530,7 @@ export function HomePage({ onNavigate }: HomePageProps) {
                         </div>
                       </div>
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             </div>
@@ -571,9 +559,8 @@ export function HomePage({ onNavigate }: HomePageProps) {
             {/* CTA Button */}
             <div className="text-center">
               <Button
-                onClick={() => onNavigate('community')}
                 variant="outline"
-                className="h-12 px-8 rounded-full border-2 border-[#FF6B35] text-[#FF6B35] hover:bg-[#FF6B35] hover:text-white transition-all hover:scale-105"
+                className="h-12 px-8 rounded-full border-2 border-[#FF6B35] text-[#FF6B35] font-semibold"
               >
                 <Star className="w-5 h-5 mr-2" />
                 Read all 2,000+ reviews

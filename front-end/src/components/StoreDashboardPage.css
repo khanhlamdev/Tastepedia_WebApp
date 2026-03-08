@@ -1,11 +1,10 @@
 .store-dashboard-wrapper {
     display: flex;
-    min-height: 100vh;
+    min-height: 100dvh;
     background-color: #F3F4F6 !important;
     width: 100%;
     /* Prevent any inherited background or color from App.tsx parent wrapper */
     isolation: isolate;
-    contain: layout style;
     color: #111827;
     font-size: 16px;
     line-height: 1.5;

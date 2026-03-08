@@ -617,7 +617,7 @@ export function StoreDashboardPage() {
             </Dialog>
 
             {/* Mobile Bottom Navigation */}
-            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex items-center h-[65px] z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] pb-safe justify-between">
+            <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 flex items-center h-[65px] z-50 shadow-[0_-4px_10px_rgba(0,0,0,0.05)] justify-between" style={{ paddingBottom: 'env(safe-area-inset-bottom)' }}>
                 <button onClick={() => setActiveSidebarTab('overview')} className={`flex-1 flex flex-col items-center justify-center h-full px-1 ${activeSidebarTab === 'overview' ? 'text-[#FF6B35]' : 'text-gray-500 hover:text-gray-900'}`}>
                     <LayoutDashboard className="w-[22px] h-[22px] mb-1" />
                     <span className="text-[10px] font-medium leading-tight text-center w-full whitespace-nowrap">Tổng quan</span>
