@@ -48,7 +48,15 @@ export default function App() {
   const [currentSearchQuery, setCurrentSearchQuery] = useState('');
   const [isServerWakingUp, setIsServerWakingUp] = useState(false);
 
-  const BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:8080";
+  const getBaseUrl = () => {
+    let url = import.meta.env.VITE_API_URL || "http://localhost:8080";
+    if (url.endsWith('/')) {
+      url = url.slice(0, -1);
+    }
+    return url;
+  };
+
+  const BASE_URL = getBaseUrl();
   const API_URL = `${BASE_URL}/api/auth`;
 
   // --- KEEP-ALIVE PING ---
