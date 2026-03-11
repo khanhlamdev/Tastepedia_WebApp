@@ -13,9 +13,8 @@ const API_URL = 'http://localhost:8080/api';
 
 export function RegisterStorePage() {
     const navigate = useNavigate();
-    const [step, setStep] = useState<1 | 2>(1); // Step 1: Thông tin cửa hàng, Step 2: Tài khoản
+    const [step, setStep] = useState<1 | 2 | 3>(1); // Step 1: Info, Step 2: Account, Step 3: OTP
     const [loading, setLoading] = useState(false);
-    const [success, setSuccess] = useState(false);
 
     const [form, setForm] = useState({
         // Store info
@@ -31,6 +30,7 @@ export function RegisterStorePage() {
         ownerUsername: '',
         ownerPassword: '',
         confirmPassword: '',
+        otp: '',
     });
 
     const update = (field: string, value: string) =>
@@ -73,21 +73,8 @@ export function RegisterStorePage() {
                 ownerPassword: form.ownerPassword,
             });
 
-            // Auto login after successful registration
-            try {
-                const loginRes = await axios.post(`${API_URL}/auth/signin`, {
-                    username: form.ownerUsername,
-                    password: form.ownerPassword
-                }, { withCredentials: true });
-
-                localStorage.setItem("user", JSON.stringify(loginRes.data));
-                toast.success('Đăng ký thành công!');
-                navigate('/store-dashboard'); // Auto redirect
-            } catch (loginError: any) {
-                // If login fails, still show success but they have to login manually
-                toast.warning('Đăng ký thành công nhưng tự động đăng nhập thất bại. Vui lòng đăng nhập thủ công.');
-                setSuccess(true);
-            }
+            toast.success('Đã gửi mã OTP về email!');
+            setStep(3); // Chuyển sang bước nhập OTP
 
         } catch (e: any) {
             toast.error(e.response?.data?.error || 'Đăng ký thất bại, vui lòng thử lại');
@@ -96,32 +83,28 @@ export function RegisterStorePage() {
         }
     };
 
-    // --- SUCCESS SCREEN ---
-    if (success) {
-        return (
-            <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-orange-50 to-amber-50 p-4">
-                <Card className="max-w-md w-full p-8 text-center rounded-3xl shadow-xl">
-                    <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-5">
-                        <CheckCircle2 className="w-10 h-10 text-green-500" />
-                    </div>
-                    <h1 className="text-2xl font-bold mb-2">Đăng ký thành công! 🎉</h1>
-                    <p className="text-muted-foreground mb-2">
-                        Cửa hàng <strong>{form.storeName}</strong> đã được tạo.
-                    </p>
-                    <p className="text-sm text-muted-foreground mb-6">
-                        Chúng tôi đã gửi thông tin đăng nhập về <strong>{form.ownerEmail}</strong>.
-                        Bạn có thể đăng nhập ngay với username <strong>{form.ownerUsername}</strong>.
-                    </p>
-                    <Button
-                        className="w-full bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-xl h-11"
-                        onClick={() => navigate('/login')}
-                    >
-                        Đăng nhập ngay
-                    </Button>
-                </Card>
-            </div>
-        );
-    }
+    const handleVerifyOtp = async () => {
+        if (!form.otp || form.otp.length < 6) {
+            toast.error('Vui lòng nhập đủ 6 số OTP');
+            return;
+        }
+
+        setLoading(true);
+        try {
+            const res = await axios.post(`${API_URL}/stores/verify`, {
+                email: form.ownerEmail,
+                otp: form.otp
+            }, { withCredentials: true });
+
+            localStorage.setItem("user", JSON.stringify(res.data));
+            toast.success('Xác thực tài khoản thành công!');
+            navigate('/store-dashboard');
+        } catch (e: any) {
+            toast.error(e.response?.data?.error || 'Xác thực thất bại');
+        } finally {
+            setLoading(false);
+        }
+    };
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-orange-50 to-amber-50 p-4 flex items-start justify-center pt-10">
@@ -138,17 +121,17 @@ export function RegisterStorePage() {
                 </div>
 
                 {/* Progress */}
-                <div className="flex items-center gap-3 mb-8">
-                    {[1, 2].map((s) => (
-                        <div key={s} className="flex items-center gap-2 flex-1">
-                            <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold flex-shrink-0 ${step === s ? 'bg-[#FF6B35] text-white' : step > s ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
+                <div className="flex items-center gap-1.5 md:gap-3 mb-8 w-full overflow-x-auto pb-2 scrollbar-hide">
+                    {[1, 2, 3].map((s) => (
+                        <div key={s} className="flex items-center gap-1.5 md:gap-2 flex-shrink-0">
+                            <div className={`w-7 h-7 md:w-8 md:h-8 rounded-full flex items-center justify-center text-xs md:text-sm font-bold flex-shrink-0 ${step === s ? 'bg-[#FF6B35] text-white' : step > s ? 'bg-green-500 text-white' : 'bg-muted text-muted-foreground'
                                 }`}>
                                 {step > s ? '✓' : s}
                             </div>
-                            <span className={`text-sm ${step >= s ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
-                                {s === 1 ? 'Thông tin cửa hàng' : 'Tài khoản quản lý'}
+                            <span className={`text-xs md:text-sm whitespace-nowrap ${step >= s ? 'font-medium text-foreground' : 'text-muted-foreground'}`}>
+                                {s === 1 ? 'Cửa hàng' : s === 2 ? 'Tài khoản' : 'Xác thực'}
                             </span>
-                            {s < 2 && <div className={`h-0.5 flex-1 ${step > s ? 'bg-green-400' : 'bg-muted'}`} />}
+                            {s < 3 && <div className={`w-4 md:w-8 h-0.5 ml-1.5 md:ml-2 rounded-full ${step > s ? 'bg-green-400' : 'bg-muted'}`} />}
                         </div>
                     ))}
                 </div>
@@ -296,8 +279,46 @@ export function RegisterStorePage() {
                                     disabled={loading}
                                 >
                                     {loading
-                                        ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Đang đăng ký...</span>
-                                        : 'Hoàn tất đăng ký 🎉'
+                                        ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Đang xử lý...</span>
+                                        : 'Tiếp tục →'
+                                    }
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+
+                    {/* ====== STEP 3: OTP Verification ====== */}
+                    {step === 3 && (
+                        <div className="space-y-5">
+                            <div className="flex items-center gap-2 mb-1">
+                                <CheckCircle2 className="w-5 h-5 text-[#FF6B35]" />
+                                <h2 className="font-bold text-lg">Xác thực Email</h2>
+                            </div>
+                            <p className="text-sm text-muted-foreground -mt-2">
+                                Chúng tôi đã gửi một mã OTP gồm 6 số vào email <strong>{form.ownerEmail}</strong>.
+                            </p>
+
+                            <div>
+                                <Label htmlFor="otp">Mã OTP *</Label>
+                                <Input
+                                    id="otp" className="mt-1.5 text-center text-lg tracking-widest" placeholder="Nhập 6 số OTP"
+                                    value={form.otp} onChange={e => update('otp', e.target.value)}
+                                    maxLength={6}
+                                />
+                            </div>
+
+                            <div className="flex gap-3 mt-4">
+                                <Button variant="outline" className="flex-1 rounded-xl h-11" onClick={() => setStep(2)}>
+                                    ← Quay lại
+                                </Button>
+                                <Button
+                                    className="flex-1 bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-xl h-11"
+                                    onClick={handleVerifyOtp}
+                                    disabled={loading}
+                                >
+                                    {loading
+                                        ? <span className="flex items-center gap-2"><span className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Đang xác thực...</span>
+                                        : 'Hoàn tất 🎉'
                                     }
                                 </Button>
                             </div>

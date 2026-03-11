@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import axios from 'axios';
 import { ArrowLeft, Heart, ShoppingBag, Settings, ChefHat, Trophy, MapPin, Wallet, ChevronRight, MessageCircle, Phone, ShieldAlert } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -15,17 +16,23 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
   const [user, setUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [errorMsg, setErrorMsg] = useState('');
+  const [orders, setOrders] = useState<any[]>([]);
 
   useEffect(() => {
     const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
-    fetch(`${API_BASE}/api/users/profile`, { credentials: 'include' })
-      .then(async res => {
+
+    Promise.all([
+      fetch(`${API_BASE}/api/users/profile`, { credentials: 'include' }).then(async res => {
         if (res.ok) return res.json();
         const text = await res.text();
         throw new Error(text || res.statusText);
-      })
-      .then(data => {
-        setUser(data);
+      }),
+      axios.get(`${API_BASE}/api/orders/my`, { withCredentials: true }).then(res => res.data).catch(() => [])
+    ])
+      .then(([userData, ordersData]) => {
+        setUser(userData);
+        // Sort orders descending by createdAt
+        setOrders(ordersData.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()));
         setIsLoading(false);
       })
       .catch(err => {
@@ -66,30 +73,6 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
       image: 'https://images.unsplash.com/photo-1624340209404-4f479dd59708?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w3Nzg4Nzd8MHwxfHNlYXJjaHwxfHxoZWFsdGh5JTIwc2FsYWQlMjBib3dsfGVufDF8fHx8MTc2ODU2NDc5NHww&ixlib=rb-4.1.0&q=80&w=1080',
       title: 'Buddha Bowl',
       time: 20,
-    },
-  ];
-
-  const orderHistory = [
-    {
-      id: 'TP-2024-0142',
-      date: 'Jan 16, 2026',
-      items: 4,
-      total: 19.44,
-      status: 'Delivered'
-    },
-    {
-      id: 'TP-2024-0138',
-      date: 'Jan 12, 2026',
-      items: 6,
-      total: 32.50,
-      status: 'Delivered'
-    },
-    {
-      id: 'TP-2024-0125',
-      date: 'Jan 8, 2026',
-      items: 3,
-      total: 15.20,
-      status: 'Delivered'
     },
   ];
 
@@ -233,27 +216,32 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
 
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 {savedRecipes.map((recipe) => (
-                  <button
+                  <div
                     key={recipe.id}
+                    role="button"
+                    tabIndex={0}
                     onClick={() => onNavigate('recipe', recipe.id)}
-                    className="group relative aspect-square rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all"
+                    className="group relative aspect-square rounded-2xl overflow-hidden shadow-md hover:shadow-xl transition-all cursor-pointer block"
                   >
                     <img
                       src={recipe.image}
                       alt={recipe.title}
-                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                      className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300 pointer-events-none"
                     />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent"></div>
-                    <div className="absolute bottom-0 left-0 right-0 p-3">
+                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent pointer-events-none"></div>
+                    <div className="absolute bottom-0 left-0 right-0 p-3 pointer-events-none">
                       <h4 className="text-white font-semibold text-sm line-clamp-2 mb-1">
                         {recipe.title}
                       </h4>
                       <div className="text-white/80 text-xs">{recipe.time} mins</div>
                     </div>
-                    <button className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full">
+                    <button
+                      className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm rounded-full z-10"
+                      onClick={(e) => { e.stopPropagation(); }}
+                    >
                       <Heart className="w-4 h-4 fill-red-500 text-red-500" />
                     </button>
-                  </button>
+                  </div>
                 ))}
               </div>
             </Card>
@@ -265,42 +253,57 @@ export function ProfilePage({ onNavigate }: ProfilePageProps) {
               <h3 className="text-xl font-bold mb-4">Order History</h3>
 
               <div className="space-y-4">
-                {orderHistory.map((order) => (
-                  <div
-                    key={order.id}
-                    className="border border-gray-200 rounded-2xl p-4 hover:border-[#FF6B35] transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <div className="font-semibold">Order {order.id}</div>
-                        <div className="text-sm text-gray-600">{order.date}</div>
+                {orders.length === 0 ? (
+                  <div className="text-center py-10 border border-dashed text-gray-400 rounded-xl">Bạn chưa có đơn hàng nào</div>
+                ) : orders.map((order) => {
+                  let statusBadgeClass = 'bg-gray-500';
+                  let statusLabel = order.status;
+                  if (order.status === 'DELIVERED') { statusBadgeClass = 'bg-green-500'; statusLabel = 'Đã giao'; }
+                  else if (order.status === 'PENDING') { statusBadgeClass = 'bg-yellow-500'; statusLabel = 'Chờ xử lý'; }
+                  else if (order.status === 'SHIPPING') { statusBadgeClass = 'bg-orange-500'; statusLabel = 'Đang giao'; }
+                  else if (order.status === 'CONFIRMED') { statusBadgeClass = 'bg-blue-500'; statusLabel = 'Đã nhận đơn'; }
+                  else if (order.status === 'CANCELLED') { statusBadgeClass = 'bg-red-500'; statusLabel = 'Đã huỷ'; }
+
+                  const fmt = new Intl.NumberFormat('vi-VN', { style: 'currency', currency: 'VND' });
+
+                  return (
+                    <div
+                      key={order.id}
+                      className="border border-gray-200 rounded-2xl p-4 hover:border-[#FF6B35] transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <div className="font-semibold text-gray-900 border-b border-gray-100 pb-1 w-max">Đơn hàng #{order.id.slice(-6).toUpperCase()}</div>
+                          <div className="text-xs text-gray-500 mt-1">{new Date(order.createdAt).toLocaleDateString('vi-VN')} - {order.storeName}</div>
+                        </div>
+                        <Badge className={`${statusBadgeClass} text-white`}>{statusLabel}</Badge>
                       </div>
-                      <Badge className="bg-[#4CAF50] text-white">{order.status}</Badge>
-                    </div>
 
-                    <div className="flex items-center justify-between text-sm mb-3">
-                      <span className="text-gray-600">{order.items} items</span>
-                      <span className="font-bold text-[#FF6B35]">${order.total.toFixed(2)}</span>
-                    </div>
+                      <div className="flex items-center justify-between text-sm mb-3">
+                        <span className="text-gray-600">{order.items?.length || 0} món</span>
+                        <span className="font-bold text-[#FF6B35]">{fmt.format(order.totalAmount)}</span>
+                      </div>
 
-                    <div className="grid grid-cols-2 gap-2">
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="rounded-full"
-                        onClick={() => onNavigate('tracking')}
-                      >
-                        View Details
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-full"
-                      >
-                        Re-order
-                      </Button>
+                      <div className="grid grid-cols-2 gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          className="rounded-full"
+                          onClick={() => window.location.href = `/tracking/${order.id}`} // direct navigation since Profile uses mostly onNavigate prop
+                        >
+                          Xem chi tiết
+                        </Button>
+                        <Button
+                          size="sm"
+                          className="bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-full"
+                          onClick={() => onNavigate('cart')}
+                        >
+                          Đặt lại
+                        </Button>
+                      </div>
                     </div>
-                  </div>
-                ))}
+                  );
+                })}
               </div>
             </Card>
           </TabsContent>

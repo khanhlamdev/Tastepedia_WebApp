@@ -7,6 +7,7 @@ import com.tastepedia.backend.payload.SignupRequest;
 import com.tastepedia.backend.payload.VerifyRequest;
 import com.tastepedia.backend.repository.UserRepository;
 import com.tastepedia.backend.service.EmailService;
+import com.tastepedia.backend.service.OtpCacheService;
 import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession; // Import Session
@@ -32,6 +33,9 @@ public class AuthController {
 
     @Autowired
     EmailService emailService;
+
+    @Autowired
+    OtpCacheService otpCacheService;
 
     // --- 1. API QUÊN MẬT KHẨU (Gửi OTP) ---
     @PostMapping("/forgot-password")
@@ -94,21 +98,14 @@ public class AuthController {
 
         String randomOtp = String.valueOf((int) ((Math.random() * 900000) + 100000));
 
-        User user = new User();
-        user.setFullName(signUpRequest.getFullName());
-        user.setUsername(signUpRequest.getUsername());
-        user.setEmail(signUpRequest.getEmail());
-        user.setPassword(passwordEncoder.encode(signUpRequest.getPassword()));
-        user.setRole(signUpRequest.isWantsToBeCreator() ? "CREATOR" : "USER");
-        user.setOtpCode(randomOtp);
-        user.setVerified(false);
-
-        userRepository.save(user);
+        // --- KHÔNG LƯU VÀO DATABASE NGAY ---
+        // Lưu tạm vào RAM cache đợi xác thực OTP.
+        otpCacheService.savePendingUser(signUpRequest.getEmail(), signUpRequest, randomOtp);
 
         emailService.sendEmail(
-                user.getEmail(),
+                signUpRequest.getEmail(),
                 "Mã xác thực đăng ký Tastepedia",
-                "Chào " + user.getUsername() + ",\n\nMã OTP của bạn là: " + randomOtp
+                "Chào " + signUpRequest.getUsername() + ",\n\nMã OTP của bạn là: <strong>" + randomOtp + "</strong>\n\nMã này có hiệu lực trong 10 phút."
         );
 
         return ResponseEntity.ok("Đã gửi mã OTP về email. Vui lòng kiểm tra!");
@@ -172,18 +169,36 @@ public class AuthController {
     // --- 6. API XÁC THỰC OTP ---
     @PostMapping("/verify")
     public ResponseEntity<?> verifyUser(@RequestBody VerifyRequest verifyRequest) {
-        Optional<User> userOptional = userRepository.findByEmail(verifyRequest.getEmail());
+        // KIỂM TRA OTP TRONG CACHE THAY VÌ MONGODB
+        OtpCacheService.PendingUser pendingUser = otpCacheService.getPendingUser(verifyRequest.getEmail());
 
-        if (userOptional.isEmpty()) {
-            return ResponseEntity.badRequest().body("Email không tồn tại!");
+        if (pendingUser == null) {
+            return ResponseEntity.badRequest().body("Email không có yêu cầu đăng ký hoặc yêu cầu đã hết hạn!");
         }
 
-        User user = userOptional.get();
+        if (pendingUser.otp.equals(verifyRequest.getOtp())) {
+            SignupRequest signUpRequest = pendingUser.request;
 
-        if (user.getOtpCode() != null && user.getOtpCode().equals(verifyRequest.getOtp())) {
+            if (userRepository.existsByEmail(signUpRequest.getEmail())) {
+                otpCacheService.removePendingUser(verifyRequest.getEmail());
+                return ResponseEntity.badRequest().body("Tài khoản này đã được xác thực trước đó!");
+            }
+
+            // LƯU VÀO DB
+            User user = new User();
+            user.setFullName(signUpRequest.getFullName());
+            user.setUsername(signUpRequest.getUsername());
+            user.setEmail(signUpRequest.getEmail());
+            user.setPassword(passwordEncoder.encode(signUpRequest.getPassword()));
+            user.setRole(signUpRequest.isWantsToBeCreator() ? "CREATOR" : "USER");
             user.setVerified(true);
-            user.setOtpCode(null);
+            user.setAuthProvider("LOCAL");
+
             userRepository.save(user);
+
+            // Xóa cache sau khi dùng
+            otpCacheService.removePendingUser(verifyRequest.getEmail());
+
             return ResponseEntity.ok("Kích hoạt tài khoản thành công! Bạn có thể đăng nhập.");
         } else {
             return ResponseEntity.badRequest().body("Mã OTP không đúng!");
@@ -192,50 +207,43 @@ public class AuthController {
 
     // --- 7. API GOOGLE LOGIN/SIGNUP (ĐÃ CẬP NHẬT SESSION) ---
     @PostMapping("/google")
-    public ResponseEntity<?> googleAuth(@RequestBody GoogleRequest request, HttpSession session) { // Thêm tham số session
-
+    public ResponseEntity<?> googleAuth(@RequestBody GoogleRequest request, HttpSession session) {
         Optional<User> userOptional = userRepository.findByEmail(request.getEmail());
 
-        // --- TRƯỜNG HỢP 1: ĐANG Ở TAB ĐĂNG NHẬP (LOGIN) ---
-        if (request.getType().equals("LOGIN")) {
-            if (userOptional.isEmpty()) {
-                return ResponseEntity.badRequest().body("Email này chưa đăng ký Google! Vui lòng chuyển sang tab Sign Up.");
+        User user;
+        if (userOptional.isPresent()) {
+            user = userOptional.get();
+            // Nếu tài khoản đã tồn tại, tự động cập nhật googleId nếu trường này trống
+            if (user.getGoogleId() == null) {
+                user.setGoogleId(request.getGoogleId());
+                userRepository.save(user);
             }
-
-            User user = userOptional.get();
-
-            // === LƯU SESSION LOGIN GOOGLE ===
-            session.setAttribute("MY_SESSION_USER", user);
-            session.setMaxInactiveInterval(30 * 60);
-
-            return ResponseEntity.ok(user);
-        }
-
-        // --- TRƯỜNG HỢP 2: ĐANG Ở TAB ĐĂNG KÝ (SIGNUP) ---
-        else if (request.getType().equals("SIGNUP")) {
-            if (userOptional.isPresent()) {
-                return ResponseEntity.badRequest().body("Email này đã tồn tại! Vui lòng chuyển sang Log In.");
-            }
-
+        } else {
             // Tạo user mới
-            User newUser = new User();
-            newUser.setEmail(request.getEmail());
-            newUser.setFullName(request.getFullName());
-            newUser.setGoogleId(request.getGoogleId());
-            newUser.setAuthProvider("GOOGLE");
-            newUser.setRole("USER");
-            newUser.setVerified(true);
-            newUser.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
-
-            userRepository.save(newUser);
-
-            // === LƯU SESSION SIGNUP GOOGLE (Tự đăng nhập luôn) ===
-            session.setAttribute("MY_SESSION_USER", newUser);
-            session.setMaxInactiveInterval(30 * 60);
-
-            return ResponseEntity.ok(newUser);
+            user = new User();
+            user.setEmail(request.getEmail());
+            // Tạo username duy nhất từ email
+            String baseUsername = request.getEmail().split("@")[0];
+            String finalUsername = baseUsername;
+            int counter = 1;
+            while (userRepository.existsByUsername(finalUsername)) {
+                finalUsername = baseUsername + counter;
+                counter++;
+            }
+            user.setUsername(finalUsername);
+            user.setFullName(request.getFullName());
+            user.setGoogleId(request.getGoogleId());
+            user.setAuthProvider("GOOGLE");
+            user.setRole("USER");
+            user.setVerified(true);
+            user.setPassword(passwordEncoder.encode(UUID.randomUUID().toString()));
+            userRepository.save(user);
         }
 
-        return ResponseEntity.badRequest().body("Loại yêu cầu không hợp lệ");
+        // === LƯU SESSION GOOGLE ===
+        session.setAttribute("MY_SESSION_USER", user);
+        session.setMaxInactiveInterval(30 * 60);
+
+        return ResponseEntity.ok(user);
     }
 }

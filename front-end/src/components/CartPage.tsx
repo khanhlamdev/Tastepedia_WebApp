@@ -6,6 +6,7 @@ import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Separator } from './ui/separator';
 import { Card } from './ui/card';
+import { Input } from './ui/input';
 import { toast } from 'sonner';
 
 interface CartItem {
@@ -49,9 +50,58 @@ export function CartPage() {
 
   const [selectedStoreId, setSelectedStoreId] = useState<string | null>(null);
 
+  // Checkout info state
+  const [deliveryPhone, setDeliveryPhone] = useState('');
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [orderNote, setOrderNote] = useState('');
+
+  // Dynamic fee calculation
+  const [deliveryFee, setDeliveryFee] = useState<number>(15000);
+  const [isCalculatingFee, setIsCalculatingFee] = useState(false);
+  const [distanceKm, setDistanceKm] = useState<number>(0);
+
   useEffect(() => {
     loadCartAndFetchStores();
+
+    // Pre-fill user info if available
+    const userStr = localStorage.getItem('user');
+    if (userStr) {
+      try {
+        const user = JSON.parse(userStr);
+        if (user.phone) setDeliveryPhone(user.phone);
+        if (user.address) setDeliveryAddress(user.address);
+      } catch (e) {
+        console.error("Failed to parse user from local storage", e);
+      }
+    }
   }, []);
+
+  // Debounced fee calculation
+  useEffect(() => {
+    if (!selectedStoreId || !deliveryAddress.trim()) {
+      setDeliveryFee(15000);
+      setDistanceKm(0);
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      try {
+        setIsCalculatingFee(true);
+        const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
+        const res = await axios.get(`${API_BASE}/api/orders/calculate-fee`, {
+          params: { storeId: selectedStoreId, address: deliveryAddress }
+        });
+        setDeliveryFee(res.data.deliveryFee);
+        setDistanceKm(res.data.distanceKm);
+      } catch (err) {
+        console.error("Error calculating fee", err);
+      } finally {
+        setIsCalculatingFee(false);
+      }
+    }, 1200);
+
+    return () => clearTimeout(timer);
+  }, [selectedStoreId, deliveryAddress]);
 
   const loadCartAndFetchStores = async () => {
     try {
@@ -145,7 +195,8 @@ export function CartPage() {
 
   const selectedStoreEval = storeEvaluations.find(e => e.store.id === selectedStoreId);
   const subtotal = selectedStoreEval ? selectedStoreEval.totalPrice : 0;
-  const shipping = subtotal > 300000 ? 0 : 15000;
+  // If subtotal > 300000, free shipping. Else, dynamic fee
+  const shipping = subtotal >= 300000 ? 0 : deliveryFee;
   const total = selectedStoreEval ? subtotal + shipping : 0;
 
   // Render items with correct store price
@@ -173,6 +224,11 @@ export function CartPage() {
     }
     const user = JSON.parse(userStr);
 
+    if (!deliveryPhone.trim() || !deliveryAddress.trim()) {
+      toast.error("Vui lòng cung cấp đầy đủ số điện thoại và địa chỉ giao hàng");
+      return;
+    }
+
     const availableItems = cartItems
       .filter(item => isItemAvailable(item.name))
       .map(item => ({
@@ -189,17 +245,22 @@ export function CartPage() {
     const orderPayload = {
       storeId: selectedStoreId,
       items: availableItems,
-      userPhone: user.phone || 'Chưa cung cấp số điện thoại',
-      userAddress: user.address || 'Chưa cung cấp địa chỉ giao hàng',
+      userPhone: deliveryPhone,
+      userAddress: deliveryAddress,
       paymentMethod: 'COD',
       totalAmount: total,
-      note: 'Giao trong giờ hành chính'
+      note: orderNote
     };
 
     try {
       const API_BASE = import.meta.env.VITE_API_URL || "http://localhost:8080";
       await axios.post(`${API_BASE}/api/orders`, orderPayload, { withCredentials: true });
       toast.success("Đặt hàng thành công!");
+
+      // Update local storage user profile data so it persists across the app
+      const updatedUser = { ...user, phone: deliveryPhone, address: deliveryAddress };
+      localStorage.setItem('user', JSON.stringify(updatedUser));
+      window.dispatchEvent(new Event('storage')); // Trigger update for other components if needed
 
       // Only keep missing items in the cart
       const remainingCart = cartItems.filter(item => !isItemAvailable(item.name));
@@ -347,23 +408,69 @@ export function CartPage() {
                     <span>Tạm tính (chỉ tính món có sẵn)</span>
                     <span className="font-medium">{subtotal.toLocaleString('vi-VN')} đ</span>
                   </div>
-                  <div className="flex justify-between text-gray-600">
-                    <span>Phí giao hàng</span>
-                    <span className="font-medium">{shipping === 0 ? 'Miễn phí' : `${shipping.toLocaleString('vi-VN')} đ`}</span>
+                  <div className="flex justify-between text-gray-600 items-center">
+                    <span className="flex items-center gap-1">
+                      Phí giao hàng
+                      {distanceKm > 0 && <span className="text-[10px] font-semibold text-[#FF6B35] bg-orange-50 px-1.5 py-0.5 rounded-full">{distanceKm}km</span>}
+                    </span>
+                    <span className="font-medium">
+                      {isCalculatingFee ? (
+                        <span className="text-sm italic text-gray-400">Đang tính...</span>
+                      ) : (
+                        shipping === 0 ? <span className="text-green-600">Miễn phí</span> : `${shipping.toLocaleString('vi-VN')} đ`
+                      )}
+                    </span>
                   </div>
                 </div>
 
                 <Separator className="my-4" />
 
+                {/* Delivery Info Form */}
+                <div className="space-y-4 mb-6">
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Số điện thoại giao hàng *</label>
+                    <Input
+                      placeholder="Ví dụ: 0901234567"
+                      value={deliveryPhone}
+                      onChange={(e) => setDeliveryPhone(e.target.value)}
+                      className="bg-gray-50 border-gray-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Địa chỉ giao hàng *</label>
+                    <Input
+                      placeholder="Vui lòng nhập địa chỉ cụ thể"
+                      value={deliveryAddress}
+                      onChange={(e) => setDeliveryAddress(e.target.value)}
+                      className="bg-gray-50 border-gray-200"
+                    />
+                  </div>
+                  <div>
+                    <label className="text-sm font-medium text-gray-700 mb-1 block">Ghi chú cho cửa hàng (Tuỳ chọn)</label>
+                    <textarea
+                      className="w-full rounded-md border border-gray-200 bg-gray-50 px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-[#FF6B35]"
+                      rows={2}
+                      placeholder="Ghi chú thêm về đơn hàng..."
+                      value={orderNote}
+                      onChange={(e) => setOrderNote(e.target.value)}
+                    />
+                  </div>
+                </div>
+
                 <div className="flex justify-between items-center mb-6">
                   <span className="text-lg font-bold">Thành tiền</span>
-                  <span className="text-2xl font-bold text-[#FF6B35]">{total.toLocaleString('vi-VN')} đ</span>
+                  <div className="text-right">
+                    <span className="text-2xl font-bold text-[#FF6B35]">
+                      {isCalculatingFee ? <span className="text-xl text-gray-400 italic">Đang tính...</span> : `${total.toLocaleString('vi-VN')} đ`}
+                    </span>
+                    {subtotal >= 300000 && <p className="text-xs text-green-600 font-medium">Đã áp dụng Freeship (&gt;300k)</p>}
+                  </div>
                 </div>
 
                 <Button
                   onClick={handleCheckout}
-                  disabled={!selectedStoreId || storeEvaluations.length === 0}
-                  className="w-full h-12 bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-full mb-3"
+                  disabled={isCalculatingFee || !selectedStoreId || storeEvaluations.length === 0}
+                  className="w-full bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-xl py-6 text-lg font-bold shadow-lg shadow-orange-200 transition-all hover:scale-[1.02]"
                 >
                   Xác nhận đặt mua
                 </Button>

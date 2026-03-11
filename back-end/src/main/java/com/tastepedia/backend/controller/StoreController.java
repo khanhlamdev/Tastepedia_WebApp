@@ -5,6 +5,8 @@ import com.tastepedia.backend.model.User;
 import com.tastepedia.backend.repository.StoreRepository;
 import com.tastepedia.backend.repository.UserRepository;
 import com.tastepedia.backend.service.EmailService;
+import com.tastepedia.backend.service.LocationService;
+import com.tastepedia.backend.service.OtpCacheService;
 import jakarta.servlet.http.HttpSession;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
@@ -37,6 +39,12 @@ public class StoreController {
 
     @Autowired
     private EmailService emailService;
+
+    @Autowired
+    private OtpCacheService otpCacheService;
+
+    @Autowired
+    private LocationService locationService;
 
     /**
      * GET /api/stores
@@ -159,93 +167,88 @@ public class StoreController {
         }
 
         // --- Geocode địa chỉ → lat/lng (Nominatim / OpenStreetMap) ---
-        double[] coords = geocodeAddress(address);
+        double[] coords = locationService.geocodeAddress(address);
 
-        // --- Tạo Store document ---
-        Store store = new Store();
-        store.setName(storeName);
-        store.setAddress(address);
-        store.setPhone(phone);
-        store.setOpenTime(body.getOrDefault("openTime", "07:00"));
-        store.setCloseTime(body.getOrDefault("closeTime", "22:00"));
-        store.setDescription(body.getOrDefault("description", ""));
-        store.setImageUrl(body.getOrDefault("imageUrl", ""));
-        store.setLatitude(coords[0]);
-        store.setLongitude(coords[1]);
-        store.setActive(true);
-        Store savedStore = storeRepository.save(store);
+        // --- Tạo OTP và lưu vào Cache thay vì DB ---
+        String randomOtp = String.valueOf((int) ((Math.random() * 900000) + 100000));
+        otpCacheService.savePendingStore(ownerEmail, body, randomOtp, coords[0], coords[1]);
 
-        // --- Tạo User tài khoản STORE ---
-        User owner = new User();
-        owner.setFullName(ownerFullName != null ? ownerFullName : ownerUsername);
-        owner.setUsername(ownerUsername);
-        owner.setEmail(ownerEmail);
-        owner.setPassword(passwordEncoder.encode(ownerPassword));
-        owner.setRole("STORE");
-        owner.setStoreId(savedStore.getId());
-        owner.setVerified(true);  // Tự xác thực ngay, không dùng OTP
-        userRepository.save(owner);
-
-        // --- Gửi email chào mừng ---
+        // --- Gửi email OTP ---
         try {
             emailService.sendEmail(
                     ownerEmail,
-                    "Chào mừng " + storeName + " đến với Tastepedia!",
+                    "Mã xác định đăng ký Cửa hàng Tastepedia",
                     "Xin chào " + (ownerFullName != null ? ownerFullName : ownerUsername) + ",\n\n" +
-                    "Cửa hàng \"" + storeName + "\" đã đăng ký thành công trên Tastepedia!\n\n" +
-                    "Thông tin đăng nhập:\n" +
-                    "  Username: " + ownerUsername + "\n" +
-                    "  Mật khẩu: (như bạn đã nhập)\n\n" +
-                    "Truy cập: http://localhost:3000/store-dashboard\n\n" +
+                    "Mã OTP xác nhận đăng ký cửa hàng \"" + storeName + "\" của bạn là: <strong>" + randomOtp + "</strong>\n\n" +
+                    "Mã này có hiệu lực trong 10 phút.\n\n" +
                     "Trân trọng,\nĐội ngũ Tastepedia"
             );
         } catch (Exception ignored) {}
 
         return ResponseEntity.ok(Map.of(
-                "message", "Đăng ký thành công! Bạn có thể đăng nhập ngay.",
-                "storeId", savedStore.getId(),
-                "storeName", savedStore.getName()
+                "message", "Đã gửi mã OTP về email. Vui lòng kiểm tra!"
         ));
     }
 
-    // ========================================================================
-    // PRIVATE — Nominatim Geocoding
-    // ========================================================================
-
     /**
-     * Gọi Nominatim (OpenStreetMap) để convert địa chỉ → [latitude, longitude].
-     * Trả về [0.0, 0.0] nếu không tìm thấy (không blocking).
+     * POST /api/stores/verify
+     * Body: { email, otp }
      */
-    private double[] geocodeAddress(String address) {
-        try {
-            String encoded = URLEncoder.encode(address, StandardCharsets.UTF_8);
-            String url = "https://nominatim.openstreetmap.org/search?q=" + encoded + "&format=json&limit=1";
+    @PostMapping("/verify")
+    public ResponseEntity<?> verifyStore(@RequestBody Map<String, String> body, HttpSession session) {
+        String email = body.get("email");
+        String otp = body.get("otp");
 
-            HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    // Nominatim yêu cầu User-Agent để tránh bị block
-                    .header("User-Agent", "Tastepedia/1.0 (tastepediaverified@gmail.com)")
-                    .GET()
-                    .build();
-
-            HttpResponse<String> response = HttpClient.newHttpClient()
-                    .send(request, HttpResponse.BodyHandlers.ofString());
-
-            String body2 = response.body();
-            // Parse JSON thủ công (tránh thêm dependency)
-            // Format: [{"lat":"10.77","lon":"106.70",...}]
-            if (body2.contains("\"lat\":")) {
-                int latIdx = body2.indexOf("\"lat\":") + 7;
-                int latEnd = body2.indexOf("\"", latIdx);
-                int lonIdx = body2.indexOf("\"lon\":") + 7;
-                int lonEnd = body2.indexOf("\"", lonIdx);
-                double lat = Double.parseDouble(body2.substring(latIdx, latEnd));
-                double lon = Double.parseDouble(body2.substring(lonIdx, lonEnd));
-                return new double[]{lat, lon};
-            }
-        } catch (IOException | InterruptedException | NumberFormatException e) {
-            System.err.println("[Geocoding] Không thể convert địa chỉ: " + e.getMessage());
+        OtpCacheService.PendingStore pendingStore = otpCacheService.getPendingStore(email);
+        if (pendingStore == null) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Email không có yêu cầu đăng ký hoặc yêu cầu đã hết hạn"));
         }
-        return new double[]{0.0, 0.0}; // Fallback
+
+        if (!pendingStore.otp.equals(otp)) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Mã OTP không đúng"));
+        }
+
+        Map<String, String> request = pendingStore.request;
+        String ownerUsername = request.get("ownerUsername");
+
+        if (userRepository.existsByEmail(email) || userRepository.existsByUsername(ownerUsername)) {
+            otpCacheService.removePendingStore(email);
+            return ResponseEntity.badRequest().body(Map.of("error", "Tài khoản hoặc cửa hàng này đã tồn tại"));
+        }
+
+        // --- Tạo Store document ---
+        Store store = new Store();
+        store.setName(request.get("storeName"));
+        store.setAddress(request.get("address"));
+        store.setPhone(request.get("phone"));
+        store.setOpenTime(request.getOrDefault("openTime", "07:00"));
+        store.setCloseTime(request.getOrDefault("closeTime", "22:00"));
+        store.setDescription(request.getOrDefault("description", ""));
+        store.setImageUrl(request.getOrDefault("imageUrl", ""));
+        store.setLatitude(pendingStore.lat);
+        store.setLongitude(pendingStore.lng);
+        store.setActive(true);
+        Store savedStore = storeRepository.save(store);
+
+        // --- Tạo User tài khoản STORE ---
+        User owner = new User();
+        String ownerFullName = request.get("ownerFullName");
+        owner.setFullName(ownerFullName != null ? ownerFullName : ownerUsername);
+        owner.setUsername(ownerUsername);
+        owner.setEmail(email);
+        owner.setPassword(passwordEncoder.encode(request.get("ownerPassword")));
+        owner.setRole("STORE");
+        owner.setStoreId(savedStore.getId());
+        owner.setVerified(true);  // Xác thực thành công
+        userRepository.save(owner);
+
+        // Xóa cache
+        otpCacheService.removePendingStore(email);
+
+        // Tự động đăng nhập
+        session.setAttribute("MY_SESSION_USER", owner);
+        session.setMaxInactiveInterval(30 * 60);
+
+        return ResponseEntity.ok(owner); // Trả về thông tin user như login
     }
 }

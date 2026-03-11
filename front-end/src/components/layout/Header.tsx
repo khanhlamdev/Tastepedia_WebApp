@@ -103,7 +103,7 @@ export function Header() {
                 {/* Bell Icon — Live Unread Badge */}
                 <button
                   onClick={() => navigate('/notifications')}
-                  className="relative p-2 hover:bg-muted rounded-full transition-colors hidden md:block"
+                  className="relative p-2 hover:bg-muted rounded-full transition-colors"
                 >
                   <Bell className="w-6 h-6 text-foreground" />
                   {unreadCount > 0 && (

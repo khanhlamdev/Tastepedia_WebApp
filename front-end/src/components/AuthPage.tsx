@@ -98,7 +98,7 @@ export function AuthPage({ onComplete, onNavigate, initialView = 'login' }: Auth
           email: userInfo.data.email,
           fullName: userInfo.data.name,
           googleId: userInfo.data.sub,
-          type: isLogin ? "LOGIN" : "SIGNUP"
+          type: "GOOGLE"
         }, { withCredentials: true });
 
         handleAuthSuccess(res.data);

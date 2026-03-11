@@ -7,7 +7,8 @@ import { toast } from 'sonner';
 import {
     ShoppingBag, Clock, CheckCircle2, Truck, XCircle,
     Package, MapPin, Phone, User, RefreshCw, Store,
-    LayoutDashboard, Tag, History, LogOut, Plus, Pencil, Trash2
+    LayoutDashboard, Tag, History, LogOut, Plus, Pencil, Trash2,
+    Search
 } from 'lucide-react';
 import { Button } from './ui/button';
 import { Card } from './ui/card';
@@ -78,12 +79,25 @@ export function StoreDashboardPage() {
     // UI State
     const [activeSidebarTab, setActiveSidebarTab] = useState('overview');
     const [activeOrderTab, setActiveOrderTab] = useState('pending');
+
+    // Search & Filter State
+    const [searchQuery, setSearchQuery] = useState('');
+    const [filterDate, setFilterDate] = useState('');
+    const [appliedSearchQuery, setAppliedSearchQuery] = useState('');
+    const [appliedFilterDate, setAppliedFilterDate] = useState('');
+
     const stompClientRef = useRef<Client | null>(null);
 
     // Product Modal State
     const [isProductModalOpen, setIsProductModalOpen] = useState(false);
     const [editingProduct, setEditingProduct] = useState<StoreProduct | null>(null);
     const [formData, setFormData] = useState({ ingredientName: '', displayName: '', price: '', unit: 'kg', quantity: '0' });
+
+    // Store Profile State
+    const [storeProfile, setStoreProfile] = useState<any>({
+        name: '', address: '', phone: '', openTime: '', closeTime: '', description: '', imageUrl: ''
+    });
+    const [savingProfile, setSavingProfile] = useState(false);
 
     const user = (() => { try { return JSON.parse(localStorage.getItem('user') || '{}'); } catch { return {}; } })();
 
@@ -96,20 +110,24 @@ export function StoreDashboardPage() {
     // Data Fetching
     const fetchData = useCallback(async () => {
         try {
-            const [incoming, all, prods] = await Promise.all([
+            const [incoming, all, prods, profileRes] = await Promise.all([
                 axios.get(`${API_URL}/orders/store/incoming`, { withCredentials: true }),
                 axios.get(`${API_URL}/orders/store/all`, { withCredentials: true }),
                 axios.get(`${API_URL}/store-products`, { withCredentials: true }),
+                user.storeId ? axios.get(`${API_URL}/stores/${user.storeId}`) : Promise.resolve({ data: {} })
             ]);
             setOrders(incoming.data);
             setAllOrders(all.data);
             setProducts(prods.data);
+            if (profileRes.data && profileRes.data.id) {
+                setStoreProfile(profileRes.data);
+            }
         } catch (e) {
             console.error(e);
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [user.storeId]);
 
     useEffect(() => {
         fetchData();
@@ -144,10 +162,29 @@ export function StoreDashboardPage() {
     }, [user?.storeId]);
 
     // Logout
-    const handleLogout = () => {
+    const handleLogout = async () => {
+        try {
+            await axios.post(`${API_URL}/auth/logout`, {}, { withCredentials: true });
+        } catch (e) {
+            console.error('Logout error', e);
+        }
         localStorage.removeItem('user');
         toast.info("Đã đăng xuất tài khoản cửa hàng");
         navigate('/login');
+    };
+
+    // Save Profile
+    const handleSaveProfile = async () => {
+        setSavingProfile(true);
+        try {
+            const res = await axios.put(`${API_URL}/stores/${user.storeId}`, storeProfile, { withCredentials: true });
+            setStoreProfile(res.data);
+            toast.success("Cập nhật hồ sơ thành công!");
+        } catch (e: any) {
+            toast.error("Cập nhật thất bại: " + (e.response?.data?.error || e.message));
+        } finally {
+            setSavingProfile(false);
+        }
     };
 
     // Calculate Revenue
@@ -169,14 +206,64 @@ export function StoreDashboardPage() {
 
     // Order Filtering
     const getTabOrders = (tab: string): Order[] => {
-        const source = tab === 'history' ? allOrders : orders;
+        let source = tab === 'history' ? allOrders : orders;
+        let filtered = source;
+        const now = new Date();
+        const todayLocal = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0') + '-' + String(now.getDate()).padStart(2, '0');
+
         switch (tab) {
-            case 'pending': return source.filter(o => o.status === 'PENDING');
-            case 'confirmed': return source.filter(o => o.status === 'CONFIRMED');
-            case 'shipping': return source.filter(o => o.status === 'SHIPPING');
-            case 'history': return source.filter(o => ['DELIVERED', 'CANCELLED'].includes(o.status));
-            default: return source;
+            case 'pending':
+                filtered = source.filter(o => o.status === 'PENDING');
+                break;
+            case 'shipping':
+                filtered = source.filter(o => o.status === 'SHIPPING' || o.status === 'CONFIRMED');
+                // Group CONFIRMED into SHIPPING just in case old orders exist. Only show today's active orders.
+                filtered = filtered.filter(o => {
+                    try {
+                        const d = new Date(o.createdAt);
+                        return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') === todayLocal;
+                    }
+                    catch { return false; }
+                });
+                break;
+            case 'history':
+                filtered = allOrders.filter(o => {
+                    if (['DELIVERED', 'CANCELLED'].includes(o.status)) return true;
+                    if (['SHIPPING', 'CONFIRMED'].includes(o.status)) {
+                        try {
+                            const d = new Date(o.createdAt);
+                            return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0') !== todayLocal;
+                        }
+                        catch { return false; }
+                    }
+                    return false;
+                });
+                break;
+            default: break;
         }
+
+        // Apply string search
+        if (appliedSearchQuery.trim()) {
+            const q = appliedSearchQuery.toLowerCase().trim();
+            filtered = filtered.filter(o =>
+                o.id.toLowerCase().includes(q) ||
+                o.userFullName.toLowerCase().includes(q) ||
+                (o.userPhone && o.userPhone.includes(q))
+            );
+        }
+
+        // Apply date filter
+        if (appliedFilterDate) {
+            filtered = filtered.filter(o => {
+                try {
+                    const d = new Date(o.createdAt);
+                    const dLocal = d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0') + '-' + String(d.getDate()).padStart(2, '0');
+                    return dLocal === appliedFilterDate;
+                } catch { return false; }
+            });
+        }
+
+        return filtered;
     };
     const tabCount = (tab: string) => getTabOrders(tab).length;
 
@@ -229,7 +316,7 @@ export function StoreDashboardPage() {
     const OrderCard = ({ order }: { order: Order }) => {
         const cfg = STATUS_CONFIG[order.status as keyof typeof STATUS_CONFIG];
         return (
-            <Card className="flex flex-col bg-white overflow-hidden rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
+            <Card className="flex flex-col h-full bg-white overflow-hidden rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-all duration-200">
                 {/* Header */}
                 <div className="bg-gray-50/50 px-4 py-3 border-b border-gray-100 flex items-center justify-between">
                     <div className="flex flex-col">
@@ -279,7 +366,7 @@ export function StoreDashboardPage() {
                     </div>
                     {order.note && (
                         <div className="mt-3 bg-amber-50 text-amber-800 text-xs rounded-lg p-2.5 border border-amber-100">
-                            <strong className="font-semibold">Chi chú:</strong> {order.note}
+                            <strong className="font-semibold">Ghi chú:</strong> {order.note}
                         </div>
                     )}
                 </div>
@@ -294,22 +381,17 @@ export function StoreDashboardPage() {
                     <div className="flex gap-2">
                         {order.status === 'PENDING' && (
                             <>
-                                <Button className="flex-1 bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-lg h-9 text-sm font-medium shadow-none" onClick={() => updateStatus(order.id, 'CONFIRMED')}>
-                                    Nhận đơn
+                                <Button className="flex-1 bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-lg h-9 text-sm font-medium shadow-none gap-1" onClick={() => updateStatus(order.id, 'SHIPPING')}>
+                                    <Truck className="w-4 h-4" /> Bắt đầu giao
                                 </Button>
                                 <Button variant="outline" className="rounded-lg h-9 px-3 text-red-500 border-red-200 hover:bg-red-50 shadow-none font-medium" onClick={() => updateStatus(order.id, 'CANCELLED')}>
                                     Từ chối
                                 </Button>
                             </>
                         )}
-                        {order.status === 'CONFIRMED' && (
-                            <Button className="flex-1 bg-blue-600 hover:bg-blue-700 text-white rounded-lg h-9 text-sm font-medium gap-2 shadow-none" onClick={() => updateStatus(order.id, 'SHIPPING')}>
-                                <Truck className="w-4 h-4" /> Giao hàng
-                            </Button>
-                        )}
-                        {order.status === 'SHIPPING' && (
+                        {(order.status === 'SHIPPING' || order.status === 'CONFIRMED') && (
                             <Button className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg h-9 text-sm font-medium gap-2 shadow-none" onClick={() => updateStatus(order.id, 'DELIVERED')}>
-                                <CheckCircle2 className="w-4 h-4" /> Đã giao thành công
+                                <CheckCircle2 className="w-4 h-4" /> Xác nhận đã giao (Fallback)
                             </Button>
                         )}
                     </div>
@@ -350,6 +432,9 @@ export function StoreDashboardPage() {
                     <button onClick={() => setActiveSidebarTab('transactions')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeSidebarTab === 'transactions' ? 'bg-[#FF6B35]/10 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50'}`}>
                         <History className="w-5 h-5" /> Lịch sử Giao dịch
                     </button>
+                    <button onClick={() => setActiveSidebarTab('profile')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-colors ${activeSidebarTab === 'profile' ? 'bg-[#FF6B35]/10 text-[#FF6B35]' : 'text-gray-600 hover:bg-gray-50'}`}>
+                        <Store className="w-5 h-5" /> Hồ sơ cửa hàng
+                    </button>
                 </nav>
 
                 <div className="p-4 border-t border-gray-100 mt-auto">
@@ -376,6 +461,7 @@ export function StoreDashboardPage() {
                         {activeSidebarTab === 'orders' && 'Quản lý Đơn hàng'}
                         {activeSidebarTab === 'products' && 'Quản lý Sản phẩm'}
                         {activeSidebarTab === 'transactions' && 'Lịch sử Giao dịch'}
+                        {activeSidebarTab === 'profile' && 'Hồ sơ cửa hàng'}
                     </h1>
                     <Button variant="outline" size="sm" className="rounded-xl gap-2 flex-shrink-0" onClick={fetchData}>
                         <RefreshCw className="w-4 h-4" /> <span className="hidden sm:inline">Báo cáo mới</span>
@@ -453,30 +539,68 @@ export function StoreDashboardPage() {
                             {/* TAB: ORDERS */}
                             {activeSidebarTab === 'orders' && (
                                 <div className="space-y-6">
+                                    <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex flex-col md:flex-row gap-4 items-end">
+                                        <div className="flex-[2] w-full relative flex gap-2">
+                                            <div className="relative flex-1">
+                                                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5" />
+                                                <Input
+                                                    placeholder="Tìm mã đơn, tên, SĐT khách hàng..."
+                                                    value={searchQuery}
+                                                    onChange={e => setSearchQuery(e.target.value)}
+                                                    onKeyDown={e => e.key === 'Enter' && setAppliedSearchQuery(searchQuery)}
+                                                    className="pl-10 rounded-xl h-11"
+                                                />
+                                            </div>
+                                            <Button onClick={() => setAppliedSearchQuery(searchQuery)} className="h-11 rounded-lg bg-orange-100 text-orange-700 hover:bg-orange-200 shadow-none px-4 flex-shrink-0">
+                                                Tìm kiếm
+                                            </Button>
+                                        </div>
+                                        <div className="flex-[1] w-full flex gap-2">
+                                            <div className="relative flex-1">
+                                                <Input
+                                                    type="date"
+                                                    value={filterDate}
+                                                    onChange={e => setFilterDate(e.target.value)}
+                                                    className="rounded-xl h-11 border-gray-200 text-gray-600 w-full"
+                                                />
+                                                {filterDate && (
+                                                    <button onClick={() => { setFilterDate(''); setAppliedFilterDate(''); }} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-red-500">
+                                                        <XCircle className="w-4 h-4" />
+                                                    </button>
+                                                )}
+                                            </div>
+                                            <Button onClick={() => setAppliedFilterDate(filterDate)} className="h-11 rounded-lg bg-blue-50 text-blue-700 hover:bg-blue-100 shadow-none px-4 flex-shrink-0">
+                                                Lọc ngày
+                                            </Button>
+                                        </div>
+                                    </div>
+
                                     <Tabs value={activeOrderTab} onValueChange={setActiveOrderTab}>
-                                        <TabsList className="flex overflow-x-auto whitespace-nowrap bg-white border rounded-xl p-1 mb-6 shadow-sm justify-start md:grid md:grid-cols-4 w-full">
+                                        <TabsList className="flex overflow-x-auto whitespace-nowrap bg-white border rounded-xl p-1 mb-6 shadow-sm justify-start md:grid md:grid-cols-3 w-full">
                                             {[
-                                                { value: 'pending', label: 'Chờ xác nhận', count: tabCount('pending') },
-                                                { value: 'confirmed', label: 'Đã nhận', count: tabCount('confirmed') },
+                                                { value: 'pending', label: 'Chờ nhận', count: tabCount('pending') },
                                                 { value: 'shipping', label: 'Đang giao', count: tabCount('shipping') },
                                             ].map(tab => (
-                                                <TabsTrigger key={tab.value} value={tab.value} className="flex-shrink-0 whitespace-nowrap rounded-lg text-sm flex items-center gap-2 px-3 sm:px-2">
+                                                <TabsTrigger key={tab.value} value={tab.value} className="flex-shrink-0 whitespace-nowrap rounded-lg text-sm flex items-center justify-center gap-2 px-3 sm:px-2">
                                                     {tab.label}
                                                     {tab.count > 0 && (
-                                                        <span className={`text-xs font-bold px-2 py-0.5 rounded-full ${tab.value === 'pending' ? 'bg-red-500 text-white' : 'bg-muted text-muted-foreground'}`}>
+                                                        <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${tab.value === 'pending' ? 'bg-red-500 text-white' : 'bg-orange-100 text-orange-700'}`}>
                                                             {tab.count}
                                                         </span>
                                                     )}
                                                 </TabsTrigger>
                                             ))}
-                                            <TabsTrigger value="history" className="flex-shrink-0 whitespace-nowrap rounded-lg text-sm px-3 sm:px-2">Lịch sử</TabsTrigger>
+                                            <TabsTrigger value="history" className="flex-shrink-0 whitespace-nowrap flex justify-center rounded-lg text-sm px-3 sm:px-2">Lịch sử</TabsTrigger>
                                         </TabsList>
 
-                                        {['pending', 'confirmed', 'shipping', 'history'].map(tab => (
-                                            <TabsContent key={tab} value={tab} className="mt-6">
+                                        {['pending', 'shipping', 'history'].map(tab => (
+                                            <TabsContent key={tab} value={tab} className="mt-0">
                                                 {getTabOrders(tab).length === 0
-                                                    ? <div className="py-16 text-center text-muted-foreground bg-white rounded-xl border border-dashed border-gray-200">Không có đơn hàng nào trong phân loại này.</div>
-                                                    : <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 items-start">
+                                                    ? <div className="py-24 flex flex-col items-center justify-center text-center bg-white rounded-2xl border border-dashed border-gray-200">
+                                                        <Package className="w-12 h-12 text-gray-300 mb-3" />
+                                                        <p className="text-gray-500 font-medium">Không tìm thấy đơn hàng nào.</p>
+                                                    </div>
+                                                    : <div className="grid gap-4 sm:grid-cols-1 md:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 items-stretch pb-10">
                                                         {getTabOrders(tab).map(order => <OrderCard key={order.id} order={order} />)}
                                                     </div>
                                                 }
@@ -573,6 +697,57 @@ export function StoreDashboardPage() {
                                     </div>
                                 </div>
                             )}
+
+                            {/* TAB: STORE PROFILE */}
+                            {activeSidebarTab === 'profile' && (
+                                <div className="space-y-6">
+                                    <Card className="rounded-2xl shadow-sm border border-gray-100 bg-white overflow-hidden max-w-3xl">
+                                        <div className="p-6 border-b border-gray-100">
+                                            <h3 className="text-lg font-bold">Thông tin chung</h3>
+                                            <p className="text-sm text-gray-500">Khách hàng sẽ thấy thông tin này khi đặt món.</p>
+                                        </div>
+                                        <div className="p-6 space-y-4">
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium">Tên cửa hàng</label>
+                                                <Input value={storeProfile.name || ''} onChange={(e) => setStoreProfile({ ...storeProfile, name: e.target.value })} />
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium flex items-center gap-1.5"><MapPin className="w-4 h-4 text-gray-400" /> Địa chỉ</label>
+                                                <Input value={storeProfile.address || ''} onChange={(e) => setStoreProfile({ ...storeProfile, address: e.target.value })} />
+                                                <p className="text-xs text-gray-500">Toạ độ GPS sẽ được cập nhật tự động khi lưu.</p>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium flex items-center gap-1.5"><Phone className="w-4 h-4 text-gray-400" /> Số điện thoại</label>
+                                                <Input value={storeProfile.phone || ''} onChange={(e) => setStoreProfile({ ...storeProfile, phone: e.target.value })} />
+                                            </div>
+                                            <div className="grid grid-cols-2 gap-4">
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium">Giờ mở cửa</label>
+                                                    <Input type="time" value={storeProfile.openTime || ''} onChange={(e) => setStoreProfile({ ...storeProfile, openTime: e.target.value })} />
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <label className="text-sm font-medium">Giờ đóng cửa</label>
+                                                    <Input type="time" value={storeProfile.closeTime || ''} onChange={(e) => setStoreProfile({ ...storeProfile, closeTime: e.target.value })} />
+                                                </div>
+                                            </div>
+                                            <div className="space-y-2">
+                                                <label className="text-sm font-medium relative top-1">Giới thiệu ngắn (Tuỳ chọn)</label>
+                                                <textarea
+                                                    rows={3}
+                                                    className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                                                    value={storeProfile.description || ''}
+                                                    onChange={(e) => setStoreProfile({ ...storeProfile, description: e.target.value })}
+                                                />
+                                            </div>
+                                            <div className="pt-4 border-t border-gray-100 flex justify-end">
+                                                <Button className="bg-[#FF6B35] hover:bg-[#ff5722] text-white rounded-xl h-11 px-8 shadow-sm" onClick={handleSaveProfile} disabled={savingProfile}>
+                                                    {savingProfile ? 'Đang lưu...' : 'Lưu Thay Đổi'}
+                                                </Button>
+                                            </div>
+                                        </div>
+                                    </Card>
+                                </div>
+                            )}
                         </>
                     )}
                 </div>
@@ -636,6 +811,10 @@ export function StoreDashboardPage() {
                 <button onClick={() => setActiveSidebarTab('transactions')} className={`flex-1 flex flex-col items-center justify-center h-full px-1 ${activeSidebarTab === 'transactions' ? 'text-[#FF6B35]' : 'text-gray-500 hover:text-gray-900'}`}>
                     <History className="w-[22px] h-[22px] mb-1" />
                     <span className="text-[10px] font-medium leading-tight text-center w-full whitespace-nowrap">Giao dịch</span>
+                </button>
+                <button onClick={() => setActiveSidebarTab('profile')} className={`flex-1 flex flex-col items-center justify-center h-full px-1 hidden sm:flex ${activeSidebarTab === 'profile' ? 'text-[#FF6B35]' : 'text-gray-500 hover:text-gray-900'}`}>
+                    <Store className="w-[22px] h-[22px] mb-1" />
+                    <span className="text-[10px] font-medium leading-tight text-center w-full whitespace-nowrap">Hồ sơ</span>
                 </button>
                 <button onClick={handleLogout} className="flex-1 flex flex-col items-center justify-center h-full px-1 text-gray-500 hover:text-red-500">
                     <LogOut className="w-[22px] h-[22px] mb-1" />
